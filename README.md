@@ -4,8 +4,10 @@
 
 ## 실행 방법
 
+> Python 3.12+ / pygame 2.5.0+ 기준
+
 ```bash
-pip install pygame
+python -m pip install --upgrade pygame
 python main.py
 ```
 
