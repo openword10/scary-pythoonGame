@@ -24,7 +24,7 @@ class TitleRenderer:
         surface.blit(self.background, (0, 0))
         title = title_font.render("거짓의 방", True, (240, 240, 240))
         subtitle = font.render("사실은 전부 무대였다.", True, (180, 180, 180))
-        hint = font.render("ENTER 시작 / ESC 종료", True, (200, 200, 200)) if blink else None
+        hint = font.render("ENTER 시작 / E 도움말 / ESC 종료", True, (200, 200, 200)) if blink else None
         surface.blit(title, (self.width // 2 - title.get_width() // 2, 52))
         surface.blit(subtitle, (self.width // 2 - subtitle.get_width() // 2, 78))
         if hint:
@@ -35,7 +35,7 @@ class HUD:
     def __init__(self, font):
         self.font = font
 
-    def draw(self, surface, player, game):
+    def draw(self, surface, player):
         for i in range(player.max_hp):
             x = 8 + i * 12
             y = 6
@@ -43,3 +43,26 @@ class HUD:
             pygame.draw.rect(surface, color, pygame.Rect(x, y, 10, 8))
         text = self.font.render(f"HP {player.hp}/{player.max_hp}  조각 {player.score}", True, (200, 200, 200))
         surface.blit(text, (8, 18))
+
+
+def draw_help(surface, font):
+    surface.fill((12, 12, 20))
+    lines = [
+        "도움말",
+        "이동: A/D 또는 ←/→",
+        "점프: SPACE",
+        "달리기: SHIFT",
+        "공격: R (앞 방향 근접 공격)",
+        "대시: SHIFT + 방향키 (공중 스냅 대시)",
+        "도움말: E",
+        "도움말 종료: ↑ 또는 ESC",
+        "재시작: R (게임오버/클리어)",
+        "목표: 맵 끝 커튼에 도달",
+        "팁: 구멍 아래로 떨어지면 즉사",
+    ]
+    y = 20
+    for idx, line in enumerate(lines):
+        color = (220, 220, 220) if idx == 0 else (180, 180, 180)
+        text = font.render(line, True, color)
+        surface.blit(text, (20, y))
+        y += 18

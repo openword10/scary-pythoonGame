@@ -12,6 +12,8 @@ FILE_NAMES = {
     "coin": "coin.png",
     "goal": "goal.png",
     "bg": "bg.png",
+    "blood": "blood.png",
+    "attack": "attack.png",
 }
 
 
@@ -126,6 +128,18 @@ def _placeholder_bg():
     return surf
 
 
+def _placeholder_blood():
+    surf = pygame.Surface((4, 4), pygame.SRCALPHA)
+    surf.fill((180, 40, 40))
+    return surf
+
+
+def _placeholder_attack():
+    surf = pygame.Surface((16, 12), pygame.SRCALPHA)
+    pygame.draw.rect(surf, (240, 220, 180), pygame.Rect(1, 1, 14, 10), 1)
+    return surf
+
+
 def load_font(size):
     try:
         return pygame.font.SysFont("malgungothic", size)
@@ -156,6 +170,8 @@ def ensure_placeholders():
         FILE_NAMES["coin"]: lambda: _placeholder_coin(font),
         FILE_NAMES["goal"]: lambda: _placeholder_goal(font),
         FILE_NAMES["bg"]: _placeholder_bg,
+        FILE_NAMES["blood"]: _placeholder_blood,
+        FILE_NAMES["attack"]: _placeholder_attack,
     }
     for filename, creator in creators.items():
         path = os.path.join(ASSET_DIR, filename)
@@ -192,5 +208,7 @@ def build_assets():
         "coin": load_image(FILE_NAMES["coin"]),
         "goal": load_image(FILE_NAMES["goal"]),
         "bg": load_image(FILE_NAMES["bg"]),
+        "blood": load_image(FILE_NAMES["blood"], size=(4, 4)),
+        "attack": load_image(FILE_NAMES["attack"], size=(16, 12)),
     }
     return assets
