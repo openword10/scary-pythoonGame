@@ -6,6 +6,9 @@ from entities import Player, Projectile
 from items import ItemLibrary, ItemPickup
 from ui import HUD
 from world import LEVEL_PIXEL_H, LEVEL_PIXEL_W, TILE_SIZE, Level
+from items import ItemLibrary
+from ui import HUD
+from world import ROOM_PIXEL_H, ROOM_PIXEL_W, TILE_SIZE, WorldMap
 
 
 STATE_TITLE = "title"
@@ -35,6 +38,11 @@ class Game:
         self.level = Level(self.item_library)
         self.floor = 1
         self.player = Player(TILE_SIZE * 2, LEVEL_PIXEL_H - TILE_SIZE * 4)
+        self.world = WorldMap(3, self.item_library)
+        self.floor = 1
+        self.current_room_coord = self.world.start
+        self.current_room = self.world.get_room(self.current_room_coord)
+        self.player = Player(ROOM_PIXEL_W // 2, ROOM_PIXEL_H // 2)
         self.hud = HUD(self.font, self.assets)
         self.entry_timer = 0
         self.entry_text = ""
@@ -47,6 +55,13 @@ class Game:
     def reset_level(self, first_time=False):
         if first_time:
             self.level = Level(self.item_library)
+        self.reset_room(self.current_room, first_time=True)
+
+    def reset_room(self, room, first_time=False):
+        if first_time or not room.visited:
+            room.spawn_enemies(difficulty=1 if self.floor == 1 else 2)
+        room.visited = True
+        room.projectiles = []
         self.entry_text = random.choice(ENTRY_LINES)
         self.entry_timer = 1.2
 
