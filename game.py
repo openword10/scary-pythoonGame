@@ -1,12 +1,11 @@
-# game.py
 import random
 import pygame
 
-from assets import build_assets
+from assets import build_assets, load_font
 from entities import Player, Projectile
-from items import ItemLibrary, ItemPickup
-from ui import HUD
-from world import LEVEL_PIXEL_H, LEVEL_PIXEL_W, TILE_SIZE, Level
+from items import ItemLibrary
+from ui import HUD, TitleRenderer
+from world import ROOM_PIXEL_H, ROOM_PIXEL_W, TILE_SIZE, ENTRY_LINES, WorldMap
 
 
 STATE_TITLE = "title"
@@ -15,273 +14,263 @@ STATE_GAME_OVER = "game_over"
 STATE_VICTORY = "victory"
 
 
-ENTRY_LINES = [
-    "컷. 다시.",
-    "웃어. 장면이 망가져.",
-    "관객은 없었다.",
-    "무대는 텅 비어 있었다.",
-    "대사는 거짓으로 울린다.",
-]
-
-
 class Game:
     def __init__(self, screen, render_surface):
         self.screen = screen
         self.render_surface = render_surface
         self.clock = pygame.time.Clock()
-
         self.assets = build_assets()
-
-        # 폰트: 한글 폰트가 없으면 기본 폰트로 fallback
-        try:
-            self.font = pygame.font.SysFont("malgungothic", 12)
-            if self.font is None:
-                raise RuntimeError("Font not found")
-        except Exception:
-            self.font = pygame.font.Font(None, 18)
-
+        self.font = load_font(12)
+        self.big_font = load_font(20)
         self.state = STATE_TITLE
-
         self.item_library = ItemLibrary()
-        self.level = Level(self.item_library)
-        self.player = Player(TILE_SIZE * 2, LEVEL_PIXEL_H - TILE_SIZE * 4)
-
-        self.hud = HUD(self.font, self.assets)
-
-        self.entry_timer = 0.0
+        self.world = WorldMap(3, self.item_library)
+        self.floor = 1
+        self.current_room_coord = self.world.start
+        self.current_room = self.world.get_room(self.current_room_coord)
+        self.player = Player(ROOM_PIXEL_W // 2, ROOM_PIXEL_H // 2)
+        self.entry_timer = 0
         self.entry_text = ""
         self.hint_text = ""
-
         self.projectile_speed_bonus = 0
         self.enemy_speed_bonus = 0
+        self.title_renderer = TitleRenderer(ROOM_PIXEL_W, ROOM_PIXEL_H)
+        self.hud = HUD(self.font)
+        self.error_message = ""
+        self.reset_room(self.current_room, first_time=True)
 
-        self.camera = pygame.Vector2(0, 0)
-
-        self.reset_level(first_time=True)
-
-    def reset_level(self, first_time=False):
-        # 스테이지 리셋(완전 초기화)
-        self.level = Level(self.item_library)
-        self.player = Player(TILE_SIZE * 2, LEVEL_PIXEL_H - TILE_SIZE * 4)
-
+    def reset_room(self, room, first_time=False):
+        if first_time or not room.visited:
+            room.spawn_enemies(difficulty=1 if self.floor == 1 else 2)
+        room.visited = True
+        room.projectiles = []
         self.entry_text = random.choice(ENTRY_LINES)
         self.entry_timer = 1.2
 
-        self.hint_text = ""
-        self.projectile_speed_bonus = 0
-        self.enemy_speed_bonus = 0
+    def reveal_next_room_hint(self):
+        neighbors = [coord for coord in self.world.neighbors(self.current_room_coord).values() if self.world.in_bounds(coord)]
+        if neighbors:
+            self.hint_text = f"다음 방: {random.choice(neighbors)}"
 
-        self.camera.update(0, 0)
+    def boost_projectiles(self):
+        self.projectile_speed_bonus += 60
+
+    def boost_enemies(self):
+        self.enemy_speed_bonus += 10
 
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
-
             if event.type == pygame.KEYDOWN:
                 if self.state == STATE_TITLE:
-                    # ENTER로 시작(다른 키도 허용하고 싶으면 여기 조건 변경)
-                    if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                        self.state = STATE_PLAYING
-                        self.entry_text = random.choice(ENTRY_LINES)
-                        self.entry_timer = 1.2
+                    if event.key == pygame.K_ESCAPE:
+                        return False
+                    self.state = STATE_PLAYING
                 elif self.state in (STATE_GAME_OVER, STATE_VICTORY):
-                    # 아무 키로 다시
-                    self.state = STATE_TITLE
-                    self.reset_level(first_time=True)
-                elif self.state == STATE_PLAYING:
-                    if event.key in (pygame.K_SPACE, pygame.K_w):
-                        # 점프는 Player가 지원한다는 전제
-                        self.player.jump()
-                    elif event.key == pygame.K_r:
-                        # R: 강제 리셋
-                        self.reset_level(first_time=True)
-
+                    if event.key == pygame.K_ESCAPE:
+                        return False
+                    self.restart_game()
+                elif self.state == STATE_PLAYING and event.key == pygame.K_r:
+                    if self.player.room_reset_charges > 0:
+                        self.player.room_reset_charges -= 1
+                        self.reset_room(self.current_room, first_time=True)
         return True
+
+    def restart_game(self):
+        self.state = STATE_TITLE
+        self.world = WorldMap(3, self.item_library)
+        self.current_room_coord = self.world.start
+        self.current_room = self.world.get_room(self.current_room_coord)
+        self.player = Player(ROOM_PIXEL_W // 2, ROOM_PIXEL_H // 2)
+        self.floor = 1
+        self.entry_text = ""
+        self.hint_text = ""
+        self.projectile_speed_bonus = 0
+        self.enemy_speed_bonus = 0
+        self.error_message = ""
+        self.reset_room(self.current_room, first_time=True)
 
     def update(self, dt):
         if self.state != STATE_PLAYING:
             return
 
         keys = pygame.key.get_pressed()
-
-        # 이동(A/D)
         move_dir = pygame.Vector2(0, 0)
+        if keys[pygame.K_w]:
+            move_dir.y -= 1
+        if keys[pygame.K_s]:
+            move_dir.y += 1
         if keys[pygame.K_a]:
             move_dir.x -= 1
         if keys[pygame.K_d]:
             move_dir.x += 1
+        self.player.move(dt, move_dir, self.current_room)
 
-        # Player.move(dt, move_dir, level) 형태라고 가정(네 코드 유지)
-        self.player.move(dt, move_dir, self.level)
-
-        # 발사(방향키)
         shoot_dir = pygame.Vector2(0, 0)
-        if keys[pygame.K_LEFT]:
-            shoot_dir.x -= 1
-        if keys[pygame.K_RIGHT]:
-            shoot_dir.x += 1
         if keys[pygame.K_UP]:
             shoot_dir.y -= 1
         if keys[pygame.K_DOWN]:
             shoot_dir.y += 1
-
+        if keys[pygame.K_LEFT]:
+            shoot_dir.x -= 1
+        if keys[pygame.K_RIGHT]:
+            shoot_dir.x += 1
         if shoot_dir.length_squared() > 0 and self.player.can_shoot():
             projectile = Projectile(
                 self.player.rect.centerx - 3,
                 self.player.rect.centery - 3,
                 shoot_dir,
-                speed=260 + self.projectile_speed_bonus,
+                speed=220 + self.projectile_speed_bonus,
             )
-            self.level.projectiles.append(projectile)
+            self.current_room.projectiles.append(projectile)
             self.player.reset_shoot()
 
-        # Player.update 시그니처가 애매해서(너 코드 그대로) 원래 호출 유지
-        self.player.update(dt, self.level, self.player)
+        self.player.update(dt, self.current_room, self.player)
 
-        # 탄 업데이트
-        for projectile in list(self.level.projectiles):
-            projectile.update(dt, self.level, self.player)
+        for projectile in list(self.current_room.projectiles):
+            projectile.update(dt, self.current_room, self.player)
             if not projectile.alive:
-                self.level.projectiles.remove(projectile)
+                self.current_room.projectiles.remove(projectile)
 
-        # 적 업데이트/충돌
-        for enemy in list(self.level.enemies):
+        for enemy in list(self.current_room.enemies):
             enemy.speed_bonus = self.enemy_speed_bonus
-            enemy.update(dt, self.level, self.player)
-
+            enemy.update(dt, self.current_room, self.player)
             if enemy.rect.colliderect(self.player.rect):
                 self.player.take_damage(1)
-
             if not enemy.alive:
-                self.level.enemies.remove(enemy)
-                if random.random() < 0.25:
-                    item = self.item_library.random_item()
-                    self.level.pickups.append(ItemPickup(enemy.rect.x, enemy.rect.y, item))
+                self.current_room.enemies.remove(enemy)
 
-        # 탄-적 충돌
-        for projectile in list(self.level.projectiles):
-            for enemy in self.level.enemies:
+        for projectile in list(self.current_room.projectiles):
+            for enemy in self.current_room.enemies:
                 if projectile.rect.colliderect(enemy.rect):
                     enemy.take_damage(1)
                     projectile.alive = False
-            if not projectile.alive and projectile in self.level.projectiles:
-                self.level.projectiles.remove(projectile)
+            if not projectile.alive and projectile in self.current_room.projectiles:
+                self.current_room.projectiles.remove(projectile)
 
-        # 아이템 줍기
-        for pickup in self.level.pickups:
-            if (not pickup.collected) and pickup.rect.colliderect(self.player.rect):
+        for pickup in self.current_room.pickups:
+            if not pickup.collected and pickup.rect.colliderect(self.player.rect):
                 pickup.collected = True
-                pickup.item.apply(self.player, self, self.level)
+                pickup.item.apply(self.player, self, self.current_room)
                 self.player.item_texts.append(f"{pickup.item.name}: {pickup.item.description}")
 
-        self.level.pickups = [p for p in self.level.pickups if not p.collected]
+        self.current_room.pickups = [pickup for pickup in self.current_room.pickups if not pickup.collected]
 
-        # 사망
+        self.current_room.update_clear_state()
+        self.handle_doors()
+
         if self.player.hp <= 0:
             self.state = STATE_GAME_OVER
 
-        # 클리어(모든 적 처치 + 출구 도달)
-        if self.level.update_clear_state() and self.player.rect.colliderect(self.level.exit_rect):
+        if self.current_room_coord == (self.world.size - 1, self.world.size - 1) and self.current_room.cleared:
             self.state = STATE_VICTORY
 
-        # 입장 문구 타이머
         if self.entry_timer > 0:
             self.entry_timer -= dt
 
-        self.update_camera()
+    def handle_doors(self):
+        open_doors = self.get_open_doors()
+        if self.current_room.cleared:
+            self.current_room.rebuild_walls(list(open_doors.values()))
+        else:
+            self.current_room.rebuild_walls([])
 
-    def update_camera(self):
-        target_x = self.player.rect.centerx - self.render_surface.get_width() // 2
-        target_y = self.player.rect.centery - self.render_surface.get_height() // 2
+        if not self.current_room.cleared:
+            return
 
-        self.camera.x = max(0, min(target_x, LEVEL_PIXEL_W - self.render_surface.get_width()))
-        self.camera.y = max(0, min(target_y, LEVEL_PIXEL_H - self.render_surface.get_height()))
+        for direction, rect in open_doors.items():
+            if self.player.rect.colliderect(rect):
+                self.move_room(direction)
+                break
 
-    def draw_level(self):
+    def get_open_doors(self):
+        mid_x = ROOM_PIXEL_W // 2 - TILE_SIZE // 2
+        mid_y = ROOM_PIXEL_H // 2 - TILE_SIZE // 2
+        doors = {
+            "up": pygame.Rect(mid_x, 0, TILE_SIZE, TILE_SIZE),
+            "down": pygame.Rect(mid_x, ROOM_PIXEL_H - TILE_SIZE, TILE_SIZE, TILE_SIZE),
+            "left": pygame.Rect(0, mid_y, TILE_SIZE, TILE_SIZE),
+            "right": pygame.Rect(ROOM_PIXEL_W - TILE_SIZE, mid_y, TILE_SIZE, TILE_SIZE),
+        }
+        open_doors = {}
+        for direction, coord in self.world.neighbors(self.current_room_coord).items():
+            if self.world.in_bounds(coord):
+                open_doors[direction] = doors[direction]
+        return open_doors
+
+    def move_room(self, direction):
+        next_coord = self.world.neighbors(self.current_room_coord)[direction]
+        if not self.world.in_bounds(next_coord):
+            return
+        self.current_room_coord = next_coord
+        self.current_room = self.world.get_room(self.current_room_coord)
+        self.player.rect.center = (ROOM_PIXEL_W // 2, ROOM_PIXEL_H // 2)
+        self.reset_room(self.current_room)
+
+    def draw_room(self):
         floor = self.assets["floor"]
-        wall = self.assets["wall"]
+        for y in range(0, ROOM_PIXEL_H, TILE_SIZE):
+            for x in range(0, ROOM_PIXEL_W, TILE_SIZE):
+                self.render_surface.blit(floor, (x, y))
 
-        # 바닥 깔기
-        for y in range(0, LEVEL_PIXEL_H, TILE_SIZE):
-            for x in range(0, LEVEL_PIXEL_W, TILE_SIZE):
-                self.render_surface.blit(floor, (x - self.camera.x, y - self.camera.y))
+        wall_image = self.assets["wall"]
+        for wall in self.current_room.base_walls:
+            self.render_surface.blit(wall_image, wall.topleft)
 
-        # 벽/플랫폼
-        for solid in self.level.solid_rects:
-            self.render_surface.blit(wall, (solid.x - self.camera.x, solid.y - self.camera.y))
+        open_doors = self.get_open_doors()
+        for rect in open_doors.values():
+            door_image = self.assets["door_open"] if self.current_room.cleared else self.assets["door_closed"]
+            self.render_surface.blit(door_image, rect.topleft)
 
-        # 소품(테이프/X/커튼)
-        for px, py, prop_type in self.level.props:
+        for px, py, prop_type in self.current_room.props:
             key = f"prop_{prop_type}"
-            if key in self.assets:
-                self.render_surface.blit(self.assets[key], (px - self.camera.x, py - self.camera.y))
-
-        # 출구 표시
-        pygame.draw.rect(self.render_surface, (80, 140, 200), self.level.exit_rect.move(-self.camera.x, -self.camera.y))
-
-    def draw_title(self):
-        self.render_surface.fill((10, 10, 14))
-        title = self.font.render("거짓의 방", True, (240, 240, 240))
-        subtitle = self.font.render("ENTER 시작 / A,D 이동 / SPACE 점프 / 방향키 발사", True, (180, 180, 180))
-        self.render_surface.blit(title, (self.render_surface.get_width() // 2 - title.get_width() // 2, 70))
-        self.render_surface.blit(subtitle, (self.render_surface.get_width() // 2 - subtitle.get_width() // 2, 95))
-
-    def draw_end(self, message):
-        self.render_surface.fill((10, 10, 14))
-        text = self.font.render(message, True, (240, 120, 120))
-        sub = self.font.render("아무 키로 다시", True, (180, 180, 180))
-        self.render_surface.blit(text, (self.render_surface.get_width() // 2 - text.get_width() // 2, 70))
-        self.render_surface.blit(sub, (self.render_surface.get_width() // 2 - sub.get_width() // 2, 95))
+            self.render_surface.blit(self.assets[key], (px, py))
 
     def draw(self):
+        self.render_surface.fill((15, 15, 20))
         if self.state == STATE_TITLE:
-            self.draw_title()
-
+            blink = (pygame.time.get_ticks() // 600) % 2 == 0
+            self.title_renderer.draw(self.render_surface, self.big_font, self.font, blink)
         elif self.state == STATE_PLAYING:
-            self.render_surface.fill((15, 15, 20))
-            self.draw_level()
-
-            # 아이템
-            for pickup in self.level.pickups:
-                icon = self.assets.get(pickup.item.icon_key)
-                if icon:
-                    self.render_surface.blit(icon, (pickup.rect.x - self.camera.x, pickup.rect.y - self.camera.y))
-
-            # 탄/적/플레이어
-            for projectile in self.level.projectiles:
-                projectile.draw(self.render_surface, self.assets["bullet"], self.camera)
-
-            for enemy in self.level.enemies:
+            self.draw_room()
+            for pickup in self.current_room.pickups:
+                self.render_surface.blit(self.assets[pickup.item.icon_key], pickup.rect.topleft)
+            for projectile in self.current_room.projectiles:
+                projectile.draw(self.render_surface, self.assets["bullet"])
+            for enemy in self.current_room.enemies:
                 if enemy.__class__.__name__ == "Chaser":
-                    enemy.draw(self.render_surface, self.assets["chaser"], self.camera)
+                    enemy.draw(self.render_surface, self.assets["enemy1"])
                 else:
-                    enemy.draw(self.render_surface, self.assets["dasher"], self.camera)
-
-            self.player.draw(self.render_surface, self.assets["player"], self.camera)
-
-            # 입장 문구
+                    enemy.draw(self.render_surface, self.assets["enemy2"])
+            self.player.draw(self.render_surface, self.assets["player"])
             if self.entry_timer > 0:
                 text = self.font.render(self.entry_text, True, (220, 200, 180))
-                self.render_surface.blit(text, (self.render_surface.get_width() // 2 - text.get_width() // 2, 6))
-
-            self.hud.draw(self.render_surface, self.player, self)
-
+                self.render_surface.blit(text, (ROOM_PIXEL_W // 2 - text.get_width() // 2, 6))
+            self.hud.draw(self.render_surface, self, self.player)
         elif self.state == STATE_GAME_OVER:
             self.draw_end("게임 오버")
-
         elif self.state == STATE_VICTORY:
             self.draw_end("막이 내렸다")
 
-        # 스케일 업(정수배 권장인데, main.py가 이미 정수배 창을 만들었다고 가정)
         scaled = pygame.transform.scale(self.render_surface, self.screen.get_size())
         self.screen.blit(scaled, (0, 0))
         pygame.display.flip()
+
+    def draw_end(self, message):
+        text = self.big_font.render(message, True, (240, 120, 120))
+        sub = self.font.render("ENTER로 다시", True, (180, 180, 180))
+        self.render_surface.blit(text, (ROOM_PIXEL_W // 2 - text.get_width() // 2, 90))
+        self.render_surface.blit(sub, (ROOM_PIXEL_W // 2 - sub.get_width() // 2, 110))
 
     def run(self):
         running = True
         while running:
             dt = self.clock.tick(60) / 1000.0
             running = self.handle_events()
-            self.update(dt)
+            try:
+                self.update(dt)
+            except Exception as exc:
+                print(f"[오류] {exc}")
+                self.state = STATE_GAME_OVER
             self.draw()

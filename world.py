@@ -4,100 +4,108 @@ import pygame
 from entities import Chaser, Dasher
 from items import ItemPickup
 
-
 TILE_SIZE = 16
-VIEW_TILES_W = 30
-VIEW_TILES_H = 17
-VIEW_PIXEL_W = VIEW_TILES_W * TILE_SIZE
-VIEW_PIXEL_H = VIEW_TILES_H * TILE_SIZE
-LEVEL_TILES_W = 120
-LEVEL_TILES_H = 20
-LEVEL_PIXEL_W = LEVEL_TILES_W * TILE_SIZE
-LEVEL_PIXEL_H = LEVEL_TILES_H * TILE_SIZE
+ROOM_TILES_W = 20
+ROOM_TILES_H = 15
+ROOM_PIXEL_W = ROOM_TILES_W * TILE_SIZE
+ROOM_PIXEL_H = ROOM_TILES_H * TILE_SIZE
+
+ENTRY_LINES = [
+    "컷. 다시.",
+    "웃어. 장면이 망가져.",
+    "관객은 없었다.",
+    "대본대로 움직여.",
+]
 
 
-
-class Level:
-    def __init__(self, item_library):
+class Room:
+    def __init__(self, coord, item_library):
+        self.coord = coord
         self.item_library = item_library
-        self.tiles = []
-        self.solid_rects = []
         self.enemies = []
         self.projectiles = []
         self.pickups = []
         self.props = []
-        self.exit_rect = pygame.Rect(LEVEL_PIXEL_W - TILE_SIZE * 2, TILE_SIZE * 2, TILE_SIZE, TILE_SIZE * 3)
-        self._build_tiles()
+        self.cleared = False
+        self.visited = False
+        self.message = ""
+        self.base_walls = []
+        self.wall_rects = []
+        self._build_room()
+
+    def _build_room(self):
+        self.base_walls = []
+        for x in range(ROOM_TILES_W):
+            self.base_walls.append(pygame.Rect(x * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE))
+            self.base_walls.append(
+                pygame.Rect(x * TILE_SIZE, (ROOM_TILES_H - 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            )
+        for y in range(1, ROOM_TILES_H - 1):
+            self.base_walls.append(pygame.Rect(0, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+            self.base_walls.append(
+                pygame.Rect((ROOM_TILES_W - 1) * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            )
         self._build_props()
-        self._spawn_enemies()
-        self._spawn_items()
-
-    def _build_tiles(self):
-        self.tiles = [[0 for _ in range(LEVEL_TILES_W)] for _ in range(LEVEL_TILES_H)]
-        ground_y = LEVEL_TILES_H - 2
-        for x in range(LEVEL_TILES_W):
-            self.tiles[ground_y][x] = 1
-            self.tiles[ground_y + 1][x] = 1
-
-        platform_specs = [
-            (6, 13, 6),
-            (18, 11, 8),
-            (34, 14, 5),
-            (46, 10, 7),
-            (60, 12, 6),
-            (75, 9, 10),
-            (92, 13, 8),
-            (108, 11, 6),
-        ]
-        for start_x, y, length in platform_specs:
-            for x in range(start_x, min(start_x + length, LEVEL_TILES_W - 2)):
-                self.tiles[y][x] = 1
-
-        self._rebuild_solids()
-
-    def _rebuild_solids(self):
-        self.solid_rects = []
-        for y, row in enumerate(self.tiles):
-            for x, tile in enumerate(row):
-                if tile == 1:
-                    self.solid_rects.append(pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
 
     def _build_props(self):
         self.props = []
-        for _ in range(32):
-            px = random.randint(2, LEVEL_TILES_W - 3) * TILE_SIZE
-            py = random.randint(2, LEVEL_TILES_H - 5) * TILE_SIZE
+        for _ in range(random.randint(5, 9)):
+            px = random.randint(2, ROOM_TILES_W - 3) * TILE_SIZE
+            py = random.randint(2, ROOM_TILES_H - 3) * TILE_SIZE
             prop_type = random.choice(["tape", "mark", "curtain"])
             self.props.append((px, py, prop_type))
 
-    def _spawn_enemies(self):
-        self.enemies = []
-        spawn_points = [
-            (10, 15),
-            (24, 10),
-            (30, 15),
-            (52, 9),
-            (66, 11),
-            (80, 8),
-            (96, 14),
-            (110, 10),
-        ]
-        for idx, (x, y) in enumerate(spawn_points):
-            px = x * TILE_SIZE
-            py = y * TILE_SIZE
-            if idx % 2 == 0:
-                self.enemies.append(Chaser(px, py))
-            else:
-                self.enemies.append(Dasher(px, py))
+    def rebuild_walls(self, open_doors):
+        self.wall_rects = list(self.base_walls)
+        for door_rect in open_doors:
+            self.wall_rects = [wall for wall in self.wall_rects if not wall.colliderect(door_rect)]
 
-    def _spawn_items(self):
-        self.pickups = []
-        for x in (14, 40, 70, 100):
-            item = self.item_library.random_item()
-            self.pickups.append(ItemPickup(x * TILE_SIZE, (LEVEL_TILES_H - 4) * TILE_SIZE, item))
+    def spawn_enemies(self, difficulty):
+        self.enemies = []
+        count = random.randint(2, 4 + difficulty)
+        for _ in range(count):
+            x = random.randint(3, ROOM_TILES_W - 4) * TILE_SIZE
+            y = random.randint(3, ROOM_TILES_H - 4) * TILE_SIZE
+            if random.random() < 0.55:
+                self.enemies.append(Chaser(x, y))
+            else:
+                self.enemies.append(Dasher(x, y))
+
+    def spawn_item(self):
+        item = self.item_library.random_item()
+        x = ROOM_PIXEL_W // 2 - 8
+        y = ROOM_PIXEL_H // 2 - 8
+        self.pickups.append(ItemPickup(x, y, item))
 
     def update_clear_state(self):
-        return all(not enemy.alive for enemy in self.enemies)
-WorldMap = Level
-ROOM_PIXEL_W = VIEW_PIXEL_W
-ROOM_PIXEL_H = VIEW_PIXEL_H
+        if not self.cleared and all(not enemy.alive for enemy in self.enemies):
+            self.cleared = True
+            if not self.pickups:
+                self.spawn_item()
+
+
+class WorldMap:
+    def __init__(self, size, item_library):
+        self.size = size
+        self.item_library = item_library
+        self.rooms = {}
+        for y in range(size):
+            for x in range(size):
+                self.rooms[(x, y)] = Room((x, y), item_library)
+        self.start = (size // 2, size // 2)
+
+    def get_room(self, coord):
+        return self.rooms.get(coord)
+
+    def neighbors(self, coord):
+        x, y = coord
+        return {
+            "up": (x, y - 1),
+            "down": (x, y + 1),
+            "left": (x - 1, y),
+            "right": (x + 1, y),
+        }
+
+    def in_bounds(self, coord):
+        x, y = coord
+        return 0 <= x < self.size and 0 <= y < self.size

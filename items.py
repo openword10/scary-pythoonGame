@@ -30,7 +30,7 @@ class ItemLibrary:
             Item(
                 "종이 가면",
                 "피해 감소 +1",
-                "item_paper_mask",
+                "item_mask",
                 lambda player, game, room: setattr(player, "damage_reduction", player.damage_reduction + 1),
             ),
             Item(
@@ -41,7 +41,7 @@ class ItemLibrary:
             ),
             Item(
                 "대본",
-                "다음 방 힌트 노출",
+                "다음 방 힌트",
                 "item_script",
                 lambda player, game, room: game.reveal_next_room_hint(),
             ),

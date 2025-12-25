@@ -1,6 +1,6 @@
-# 거짓의 방 (Scary Pythoon Game MVP)
+# 거짓의 방 (탑다운 룸 클리어 MVP)
 
-탑다운 2D 룸 클리어(아이작 느낌)의 미니 게임 MVP입니다. 모든 그래픽은 16x16 픽셀을 기준으로 렌더링되며, 외부 에셋이 없어도 자동으로 플레이스홀더 픽셀 패턴을 생성합니다.
+Python 3.x + Pygame으로 만든 탑다운 2D 룸 클리어(아이작 느낌) 미니 게임입니다. 외부 에셋이 없어도 실행되며, 없을 경우 자동으로 16x16 픽셀아트 느낌의 placeholder PNG를 생성합니다.
 
 ## 실행 방법
 
@@ -9,54 +9,27 @@ pip install pygame
 python main.py
 ```
 
-## 게임 조작
+## 조작
 
-- 이동: A / D
-- 점프: SPACE (또는 W)
-- 발사: 방향키
-- 레벨 리셋: R (지우개 아이템 획득 시)
-
-## 주요 특징
-
-- 넓은 한 장의 스크롤 맵(120 타일 폭)
-- 적 2종: 느린 추적형, 돌진형
-- 아이템 6종: 종이 가면, 테이프, 대본, 스포트라이트, 지우개, 가위
-- 레벨 진입 시 연출 문구 표시
-- HUD: 체력, 층, 플레이어 위치 X, 아이템 효과 텍스트
-- 이동: WASD
-- 발사: 방향키
+- 이동: W/A/S/D
+- 공격: 방향키 (4방향 발사)
 - 방 리셋: R (지우개 아이템 획득 시)
 
-## 주요 특징
+## 특징
 
-- 3x3 룸 맵, 룸 클리어 시 문 개방
-- 적 2종: 느린 추적형, 돌진형
+- 3x3 룸 맵, 적 처치 후 문 개방
+- 적 2종: 괴물1(추적형), 괴물2(돌진형)
 - 아이템 6종: 종이 가면, 테이프, 대본, 스포트라이트, 지우개, 가위
-- 룸 진입 시 연출 문구 표시
-- HUD: 체력, 층/룸 좌표, 아이템 효과 텍스트
+- 룸 진입 시 랜덤 문구 표시
+- 픽셀아트: 내부 해상도 320x240, 4x 정수배 스케일
 
-## 파일 구조 예시
+## 에셋 파일명 규칙
 
-```
-scary-pythoonGame/
-├─ assets/
-├─ assets.py
-├─ entities.py
-├─ game.py
-├─ items.py
-├─ main.py
-├─ ui.py
-├─ world.py
-└─ README.md
-```
-
-## 에셋 이미지 이름 규칙 (선택)
-
-assets/ 폴더에 아래 이름의 PNG를 넣으면 자동으로 로드됩니다. 없으면 플레이스홀더가 생성됩니다.
+assets/ 폴더에 아래 이름의 PNG를 넣으면 자동으로 로드됩니다. 없으면 코드가 자동 생성합니다.
 
 - player.png
-- enemy_chaser.png
-- enemy_dasher.png
+- enemy1.png
+- enemy2.png
 - bullet.png
 - floor.png
 - wall.png
@@ -65,16 +38,9 @@ assets/ 폴더에 아래 이름의 PNG를 넣으면 자동으로 로드됩니다
 - prop_tape.png
 - prop_mark.png
 - prop_curtain.png
-- item_paper_mask.png
+- item_mask.png
 - item_tape.png
 - item_script.png
 - item_spotlight.png
 - item_eraser.png
 - item_scissors.png
-
-## 개발 노트
-
-- 내부 해상도(뷰포트): 480x272 (30x17 타일)
-- 월드 해상도: 1920x320 (120x20 타일)
-- 내부 해상도: 320x240 (20x15 타일)
-- 렌더링: 정수 배율(기본 3x) 스케일 업, 픽셀 보존
