@@ -3,6 +3,9 @@ import pygame
 
 from assets import build_assets
 from entities import Player, Projectile
+from items import ItemLibrary, ItemPickup
+from ui import HUD
+from world import LEVEL_PIXEL_H, LEVEL_PIXEL_W, TILE_SIZE, Level
 from items import ItemLibrary
 from ui import HUD
 from world import ROOM_PIXEL_H, ROOM_PIXEL_W, TILE_SIZE, WorldMap
@@ -32,6 +35,9 @@ class Game:
         self.font = pygame.font.SysFont("malgungothic", 12)
         self.state = STATE_TITLE
         self.item_library = ItemLibrary()
+        self.level = Level(self.item_library)
+        self.floor = 1
+        self.player = Player(TILE_SIZE * 2, LEVEL_PIXEL_H - TILE_SIZE * 4)
         self.world = WorldMap(3, self.item_library)
         self.floor = 1
         self.current_room_coord = self.world.start
@@ -43,6 +49,12 @@ class Game:
         self.hint_text = ""
         self.projectile_speed_bonus = 0
         self.enemy_speed_bonus = 0
+        self.camera = pygame.Vector2(0, 0)
+        self.reset_level(first_time=True)
+
+    def reset_level(self, first_time=False):
+        if first_time:
+            self.level = Level(self.item_library)
         self.reset_room(self.current_room, first_time=True)
 
     def reset_room(self, room, first_time=False):
@@ -54,8 +66,7 @@ class Game:
         self.entry_timer = 1.2
 
     def reveal_next_room_hint(self):
-        neighbors = [coord for coord in self.world.neighbors(self.current_room_coord).values() if self.world.in_bounds(coord)]
-        self.hint_text = f"다음 무대: {random.choice(neighbors)}"
+        self.hint_text = "무대 끝에서 커튼이 열린다"
 
     def boost_projectiles(self):
         self.projectile_speed_bonus += 60
@@ -72,24 +83,24 @@ class Game:
                     self.state = STATE_PLAYING
                 elif self.state in (STATE_GAME_OVER, STATE_VICTORY):
                     self.restart_game()
+                elif self.state == STATE_PLAYING and event.key in (pygame.K_SPACE, pygame.K_w):
+                    self.player.jump()
                 elif self.state == STATE_PLAYING and event.key == pygame.K_r:
                     if self.player.room_reset_charges > 0:
                         self.player.room_reset_charges -= 1
-                        self.reset_room(self.current_room, first_time=True)
+                        self.reset_level(first_time=True)
         return True
 
     def restart_game(self):
         self.state = STATE_TITLE
-        self.world = WorldMap(3, self.item_library)
-        self.current_room_coord = self.world.start
-        self.current_room = self.world.get_room(self.current_room_coord)
-        self.player = Player(ROOM_PIXEL_W // 2, ROOM_PIXEL_H // 2)
+        self.level = Level(self.item_library)
+        self.player = Player(TILE_SIZE * 2, LEVEL_PIXEL_H - TILE_SIZE * 4)
         self.floor = 1
         self.entry_text = ""
         self.hint_text = ""
         self.projectile_speed_bonus = 0
         self.enemy_speed_bonus = 0
-        self.reset_room(self.current_room, first_time=True)
+        self.reset_level(first_time=True)
 
     def update(self, dt):
         if self.state != STATE_PLAYING:
@@ -97,158 +108,121 @@ class Game:
 
         keys = pygame.key.get_pressed()
         move_dir = pygame.Vector2(0, 0)
-        if keys[pygame.K_w]:
-            move_dir.y -= 1
-        if keys[pygame.K_s]:
-            move_dir.y += 1
         if keys[pygame.K_a]:
             move_dir.x -= 1
         if keys[pygame.K_d]:
             move_dir.x += 1
-        self.player.move(dt, move_dir, self.current_room)
+        self.player.move(dt, move_dir, self.level)
 
         shoot_dir = pygame.Vector2(0, 0)
-        if keys[pygame.K_UP]:
-            shoot_dir.y -= 1
-        if keys[pygame.K_DOWN]:
-            shoot_dir.y += 1
         if keys[pygame.K_LEFT]:
             shoot_dir.x -= 1
         if keys[pygame.K_RIGHT]:
             shoot_dir.x += 1
+        if keys[pygame.K_UP]:
+            shoot_dir.y -= 1
+        if keys[pygame.K_DOWN]:
+            shoot_dir.y += 1
         if shoot_dir.length_squared() > 0 and self.player.can_shoot():
             projectile = Projectile(
                 self.player.rect.centerx - 3,
                 self.player.rect.centery - 3,
                 shoot_dir,
-                speed=220 + self.projectile_speed_bonus,
+                speed=260 + self.projectile_speed_bonus,
             )
-            self.current_room.projectiles.append(projectile)
+            self.level.projectiles.append(projectile)
             self.player.reset_shoot()
 
-        self.player.update(dt, self.current_room, self.player)
+        self.player.update(dt, self.level, self.player)
 
-        for projectile in list(self.current_room.projectiles):
-            projectile.update(dt, self.current_room, self.player)
+        for projectile in list(self.level.projectiles):
+            projectile.update(dt, self.level, self.player)
             if not projectile.alive:
-                self.current_room.projectiles.remove(projectile)
+                self.level.projectiles.remove(projectile)
 
-        for enemy in list(self.current_room.enemies):
+        for enemy in list(self.level.enemies):
             enemy.speed_bonus = self.enemy_speed_bonus
-            enemy.update(dt, self.current_room, self.player)
+            enemy.update(dt, self.level, self.player)
             if enemy.rect.colliderect(self.player.rect):
                 self.player.take_damage(1)
             if not enemy.alive:
-                self.current_room.enemies.remove(enemy)
+                self.level.enemies.remove(enemy)
+                if random.random() < 0.25:
+                    item = self.item_library.random_item()
+                    self.level.pickups.append(ItemPickup(enemy.rect.x, enemy.rect.y, item))
 
-        for projectile in list(self.current_room.projectiles):
-            for enemy in self.current_room.enemies:
+        for projectile in list(self.level.projectiles):
+            for enemy in self.level.enemies:
                 if projectile.rect.colliderect(enemy.rect):
                     enemy.take_damage(1)
                     projectile.alive = False
-            if not projectile.alive and projectile in self.current_room.projectiles:
-                self.current_room.projectiles.remove(projectile)
+            if not projectile.alive and projectile in self.level.projectiles:
+                self.level.projectiles.remove(projectile)
 
-        for pickup in self.current_room.pickups:
+        for pickup in self.level.pickups:
             if not pickup.collected and pickup.rect.colliderect(self.player.rect):
                 pickup.collected = True
-                pickup.item.apply(self.player, self, self.current_room)
+                pickup.item.apply(self.player, self, self.level)
                 self.player.item_texts.append(f"{pickup.item.name}: {pickup.item.description}")
 
-        self.current_room.pickups = [pickup for pickup in self.current_room.pickups if not pickup.collected]
-
-        self.current_room.update_clear_state()
-        self.handle_doors()
+        self.level.pickups = [pickup for pickup in self.level.pickups if not pickup.collected]
 
         if self.player.hp <= 0:
             self.state = STATE_GAME_OVER
 
-        if self.current_room_coord == (self.world.size - 1, self.world.size - 1) and self.current_room.cleared:
+        if self.level.update_clear_state() and self.player.rect.colliderect(self.level.exit_rect):
             self.state = STATE_VICTORY
 
         if self.entry_timer > 0:
             self.entry_timer -= dt
 
-    def handle_doors(self):
-        open_doors = self.get_open_doors()
-        if self.current_room.cleared:
-            self.current_room.rebuild_walls(list(open_doors.values()))
-        else:
-            self.current_room.rebuild_walls([])
+        self.update_camera()
 
-        if not self.current_room.cleared:
-            return
+    def update_camera(self):
+        target_x = self.player.rect.centerx - self.render_surface.get_width() // 2
+        target_y = self.player.rect.centery - self.render_surface.get_height() // 2
+        self.camera.x = max(0, min(target_x, LEVEL_PIXEL_W - self.render_surface.get_width()))
+        self.camera.y = max(0, min(target_y, LEVEL_PIXEL_H - self.render_surface.get_height()))
 
-        for direction, rect in open_doors.items():
-            if self.player.rect.colliderect(rect):
-                self.move_room(direction)
-                break
-
-    def get_open_doors(self):
-        mid_x = ROOM_PIXEL_W // 2 - TILE_SIZE // 2
-        mid_y = ROOM_PIXEL_H // 2 - TILE_SIZE // 2
-        doors = {
-            "up": pygame.Rect(mid_x, 0, TILE_SIZE, TILE_SIZE),
-            "down": pygame.Rect(mid_x, ROOM_PIXEL_H - TILE_SIZE, TILE_SIZE, TILE_SIZE),
-            "left": pygame.Rect(0, mid_y, TILE_SIZE, TILE_SIZE),
-            "right": pygame.Rect(ROOM_PIXEL_W - TILE_SIZE, mid_y, TILE_SIZE, TILE_SIZE),
-        }
-        open_doors = {}
-        for direction, coord in self.world.neighbors(self.current_room_coord).items():
-            if self.world.in_bounds(coord):
-                open_doors[direction] = doors[direction]
-        return open_doors
-
-    def move_room(self, direction):
-        next_coord = self.world.neighbors(self.current_room_coord)[direction]
-        if not self.world.in_bounds(next_coord):
-            return
-        self.current_room_coord = next_coord
-        self.current_room = self.world.get_room(self.current_room_coord)
-        self.player.rect.center = (ROOM_PIXEL_W // 2, ROOM_PIXEL_H // 2)
-        self.reset_room(self.current_room)
-
-    def draw_room(self):
+    def draw_level(self):
         floor = self.assets["floor"]
-        for y in range(0, ROOM_PIXEL_H, TILE_SIZE):
-            for x in range(0, ROOM_PIXEL_W, TILE_SIZE):
-                self.render_surface.blit(floor, (x, y))
-
         wall_image = self.assets["wall"]
-        for wall in self.current_room.base_walls:
-            self.render_surface.blit(wall_image, wall.topleft)
+        for y in range(0, LEVEL_PIXEL_H, TILE_SIZE):
+            for x in range(0, LEVEL_PIXEL_W, TILE_SIZE):
+                self.render_surface.blit(floor, (x - self.camera.x, y - self.camera.y))
 
-        open_doors = self.get_open_doors()
-        for direction, rect in open_doors.items():
-            if self.current_room.cleared:
-                door_image = self.assets["door_open"]
-            else:
-                door_image = self.assets["door_closed"]
-            self.render_surface.blit(door_image, rect.topleft)
+        for solid in self.level.solid_rects:
+            self.render_surface.blit(wall_image, (solid.x - self.camera.x, solid.y - self.camera.y))
 
-        for px, py, prop_type in self.current_room.props:
+        for px, py, prop_type in self.level.props:
             key = f"prop_{prop_type}"
-            self.render_surface.blit(self.assets[key], (px, py))
+            self.render_surface.blit(self.assets[key], (px - self.camera.x, py - self.camera.y))
+
+        exit_color = (80, 140, 200)
+        pygame.draw.rect(self.render_surface, exit_color, self.level.exit_rect.move(-self.camera.x, -self.camera.y))
 
     def draw(self):
         self.render_surface.fill((15, 15, 20))
         if self.state == STATE_TITLE:
             self.draw_title()
         elif self.state == STATE_PLAYING:
-            self.draw_room()
-            for pickup in self.current_room.pickups:
-                self.render_surface.blit(self.assets[pickup.item.icon_key], pickup.rect.topleft)
-            for projectile in self.current_room.projectiles:
-                projectile.draw(self.render_surface, self.assets["bullet"])
-            for enemy in self.current_room.enemies:
+            self.draw_level()
+            for pickup in self.level.pickups:
+                self.render_surface.blit(
+                    self.assets[pickup.item.icon_key],
+                    (pickup.rect.x - self.camera.x, pickup.rect.y - self.camera.y),
+                )
+            for projectile in self.level.projectiles:
+                projectile.draw(self.render_surface, self.assets["bullet"], self.camera)
+            for enemy in self.level.enemies:
                 if enemy.__class__.__name__ == "Chaser":
-                    enemy.draw(self.render_surface, self.assets["chaser"])
+                    enemy.draw(self.render_surface, self.assets["chaser"], self.camera)
                 else:
-                    enemy.draw(self.render_surface, self.assets["dasher"])
-            self.player.draw(self.render_surface, self.assets["player"])
+                    enemy.draw(self.render_surface, self.assets["dasher"], self.camera)
+            self.player.draw(self.render_surface, self.assets["player"], self.camera)
             if self.entry_timer > 0:
                 text = self.font.render(self.entry_text, True, (220, 200, 180))
-                self.render_surface.blit(text, (ROOM_PIXEL_W // 2 - text.get_width() // 2, 6))
+                self.render_surface.blit(text, (self.render_surface.get_width() // 2 - text.get_width() // 2, 6))
             self.hud.draw(self.render_surface, self.player, self)
         elif self.state == STATE_GAME_OVER:
             self.draw_end("게임 오버")
@@ -261,15 +235,15 @@ class Game:
 
     def draw_title(self):
         title = self.font.render("거짓의 방", True, (240, 240, 240))
-        subtitle = self.font.render("ENTER 아무 키 - WASD 이동, 화살표 발사", True, (180, 180, 180))
-        self.render_surface.blit(title, (ROOM_PIXEL_W // 2 - title.get_width() // 2, 90))
-        self.render_surface.blit(subtitle, (ROOM_PIXEL_W // 2 - subtitle.get_width() // 2, 110))
+        subtitle = self.font.render("ENTER 아무 키 - A/D 이동, SPACE 점프", True, (180, 180, 180))
+        self.render_surface.blit(title, (self.render_surface.get_width() // 2 - title.get_width() // 2, 90))
+        self.render_surface.blit(subtitle, (self.render_surface.get_width() // 2 - subtitle.get_width() // 2, 110))
 
     def draw_end(self, message):
         text = self.font.render(message, True, (240, 120, 120))
         sub = self.font.render("아무 키로 다시", True, (180, 180, 180))
-        self.render_surface.blit(text, (ROOM_PIXEL_W // 2 - text.get_width() // 2, 90))
-        self.render_surface.blit(sub, (ROOM_PIXEL_W // 2 - sub.get_width() // 2, 110))
+        self.render_surface.blit(text, (self.render_surface.get_width() // 2 - text.get_width() // 2, 90))
+        self.render_surface.blit(sub, (self.render_surface.get_width() // 2 - sub.get_width() // 2, 110))
 
     def run(self):
         running = True

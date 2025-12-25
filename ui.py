@@ -25,7 +25,7 @@ class HUD:
                 surface.blit(gray, (x, y))
 
     def _draw_floor(self, surface, game):
-        text = self.font.render(f"층 {game.floor}  방 {game.current_room_coord}", True, (200, 200, 200))
+        text = self.font.render(f"층 {game.floor}  위치 X:{int(game.player.rect.x)}", True, (200, 200, 200))
         surface.blit(text, (8, 20))
 
     def _draw_items(self, surface, player):
