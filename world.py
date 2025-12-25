@@ -16,6 +16,7 @@ LEVEL_PIXEL_W = LEVEL_TILES_W * TILE_SIZE
 LEVEL_PIXEL_H = LEVEL_TILES_H * TILE_SIZE
 
 
+
 class Level:
     def __init__(self, item_library):
         self.item_library = item_library
@@ -97,3 +98,6 @@ class Level:
 
     def update_clear_state(self):
         return all(not enemy.alive for enemy in self.enemies)
+WorldMap = Level
+ROOM_PIXEL_W = VIEW_PIXEL_W
+ROOM_PIXEL_H = VIEW_PIXEL_H
