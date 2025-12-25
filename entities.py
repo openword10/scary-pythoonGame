@@ -1,4 +1,3 @@
-import random
 import pygame
 
 
@@ -8,192 +7,156 @@ class Entity:
         self.vel = pygame.Vector2(0, 0)
         self.alive = True
 
-    def update(self, dt, room, player):
+    def update(self, dt, world, player):
         raise NotImplementedError
-
-    def draw(self, surface, image):
-        surface.blit(image, self.rect.topleft)
-
-
-class Projectile(Entity):
-    def __init__(self, x, y, direction, speed=220, lifetime=1.2):
-        super().__init__(x, y, 6, 6)
-        if direction.length_squared() == 0:
-            direction = pygame.Vector2(1, 0)
-        self.vel = pygame.Vector2(direction).normalize() * speed
-        self.lifetime = lifetime
-
-    def update(self, dt, room, player):
-        self.lifetime -= dt
-        if self.lifetime <= 0:
-            self.alive = False
-            return
-        self.rect.x += int(self.vel.x * dt)
-        self._collide_walls(room)
-        self.rect.y += int(self.vel.y * dt)
-        self._collide_walls(room)
-
-    def _collide_walls(self, room):
-        for wall in room.wall_rects:
-            if self.rect.colliderect(wall):
-                self.alive = False
-                break
 
 
 class Player(Entity):
     def __init__(self, x, y):
-        super().__init__(x, y, 14, 14)
-        self.speed = 90
-        self.max_hp = 8
+        super().__init__(x, y, 14, 16)
+        self.speed = 120
+        self.run_speed = 180
+        self.accel = 900
+        self.air_accel = 500
+        self.friction = 1000
+        self.jump_speed = 260
+        self.gravity = 900
+        self.fall_gravity = 1400
+        self.coyote_time = 0.1
+        self.jump_buffer = 0.1
+        self.coyote_timer = 0
+        self.jump_buffer_timer = 0
+        self.max_hp = 4
         self.hp = self.max_hp
-        self.shoot_cooldown = 0.22
-        self.shoot_timer = 0
-        self.damage_reduction = 0
-        self.shield = 0
-        self.room_reset_charges = 0
-        self.item_texts = []
-        self.damage_taken_timer = 0
+        self.on_ground = False
+        self.score = 0
 
-    def update(self, dt, room, player):
-        self.shoot_timer = max(0, self.shoot_timer - dt)
-        self.damage_taken_timer = max(0, self.damage_taken_timer - dt)
+    def update(self, dt, world, player):
+        if self.on_ground:
+            self.coyote_timer = self.coyote_time
+        else:
+            self.coyote_timer = max(0, self.coyote_timer - dt)
+        self.jump_buffer_timer = max(0, self.jump_buffer_timer - dt)
 
-    def move(self, dt, direction, room):
-        if direction.length_squared() > 0:
-            direction = direction.normalize()
-        self.vel = direction * self.speed
+    def handle_input(self, dt, keys):
+        left = keys[pygame.K_a] or keys[pygame.K_LEFT]
+        right = keys[pygame.K_d] or keys[pygame.K_RIGHT]
+        run = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+        target_speed = self.run_speed if run else self.speed
+        accel = self.accel if self.on_ground else self.air_accel
+
+        if left and not right:
+            self.vel.x -= accel * dt
+            self.vel.x = max(self.vel.x, -target_speed)
+        elif right and not left:
+            self.vel.x += accel * dt
+            self.vel.x = min(self.vel.x, target_speed)
+        else:
+            if self.on_ground:
+                if self.vel.x > 0:
+                    self.vel.x = max(0, self.vel.x - self.friction * dt)
+                elif self.vel.x < 0:
+                    self.vel.x = min(0, self.vel.x + self.friction * dt)
+
+        if keys[pygame.K_SPACE]:
+            self.jump_buffer_timer = self.jump_buffer
+
+    def try_jump(self):
+        if self.jump_buffer_timer > 0 and self.coyote_timer > 0:
+            self.vel.y = -self.jump_speed
+            self.jump_buffer_timer = 0
+            self.coyote_timer = 0
+            self.on_ground = False
+
+    def apply_gravity(self, dt, jump_held):
+        gravity = self.gravity if self.vel.y < 0 and jump_held else self.fall_gravity
+        self.vel.y += gravity * dt
+
+    def move_and_collide(self, dt, solids):
         self.rect.x += int(self.vel.x * dt)
-        self._collide_walls(room, axis="x")
+        self._collide_axis(solids, axis="x")
         self.rect.y += int(self.vel.y * dt)
-        self._collide_walls(room, axis="y")
+        self.on_ground = False
+        self._collide_axis(solids, axis="y")
 
-    def _collide_walls(self, room, axis):
-        for wall in room.wall_rects:
-            if self.rect.colliderect(wall):
+    def _collide_axis(self, solids, axis):
+        for solid in solids:
+            if self.rect.colliderect(solid):
                 if axis == "x":
                     if self.vel.x > 0:
-                        self.rect.right = wall.left
+                        self.rect.right = solid.left
                     elif self.vel.x < 0:
-                        self.rect.left = wall.right
+                        self.rect.left = solid.right
+                    self.vel.x = 0
                 else:
                     if self.vel.y > 0:
-                        self.rect.bottom = wall.top
+                        self.rect.bottom = solid.top
+                        self.on_ground = True
                     elif self.vel.y < 0:
-                        self.rect.top = wall.bottom
-
-    def take_damage(self, amount):
-        if self.damage_taken_timer > 0:
-            return
-        if self.shield > 0:
-            self.shield -= 1
-            self.damage_taken_timer = 0.6
-            return
-        damage = max(1, amount - self.damage_reduction)
-        self.hp = max(0, self.hp - damage)
-        self.damage_taken_timer = 0.6
-
-    def can_shoot(self):
-        return self.shoot_timer <= 0
-
-    def reset_shoot(self):
-        self.shoot_timer = self.shoot_cooldown
+                        self.rect.top = solid.bottom
+                    self.vel.y = 0
 
 
-class Enemy(Entity):
-    def __init__(self, x, y, hp=3, speed=40):
+class Enemy1(Entity):
+    def __init__(self, x, y):
         super().__init__(x, y, 14, 14)
-        self.hp = hp
-        self.base_speed = speed
-        self.speed_bonus = 0
+        self.speed = 40
+        self.direction = -1
 
-    @property
-    def speed(self):
-        return self.base_speed + self.speed_bonus
-
-    def take_damage(self, amount):
-        self.hp -= amount
-        if self.hp <= 0:
-            self.alive = False
-
-
-class Chaser(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, hp=3, speed=35)
-
-    def update(self, dt, room, player):
-        direction = pygame.Vector2(player.rect.center) - pygame.Vector2(self.rect.center)
-        if direction.length_squared() > 0:
-            direction = direction.normalize()
-        self.vel = direction * self.speed
+    def update(self, dt, world, player):
+        self.vel.x = self.direction * self.speed
         self.rect.x += int(self.vel.x * dt)
-        self._collide_walls(room, axis="x")
-        self.rect.y += int(self.vel.y * dt)
-        self._collide_walls(room, axis="y")
-
-    def _collide_walls(self, room, axis):
-        for wall in room.wall_rects:
-            if self.rect.colliderect(wall):
-                if axis == "x":
-                    if self.vel.x > 0:
-                        self.rect.right = wall.left
-                    elif self.vel.x < 0:
-                        self.rect.left = wall.right
-                else:
-                    if self.vel.y > 0:
-                        self.rect.bottom = wall.top
-                    elif self.vel.y < 0:
-                        self.rect.top = wall.bottom
+        hit_wall = False
+        for solid in world.solids:
+            if self.rect.colliderect(solid):
+                hit_wall = True
+                if self.vel.x > 0:
+                    self.rect.right = solid.left
+                elif self.vel.x < 0:
+                    self.rect.left = solid.right
+        if hit_wall:
+            self.direction *= -1
+            return
+        front_x = self.rect.centerx + self.direction * 8
+        front_y = self.rect.bottom + 1
+        if not world.is_solid_at(front_x, front_y):
+            self.direction *= -1
 
 
-class Dasher(Enemy):
+class Enemy2(Entity):
     def __init__(self, x, y):
-        super().__init__(x, y, hp=4, speed=20)
-        self.dash_cooldown = random.uniform(1.5, 2.4)
-        self.dash_timer = self.dash_cooldown
+        super().__init__(x, y, 14, 14)
+        self.speed = 80
+        self.cooldown = 1.6
+        self.timer = self.cooldown
         self.dashing = False
-        self.dash_duration = 0.4
-        self.dash_time_left = 0
-        self.dash_velocity = pygame.Vector2(0, 0)
+        self.dash_time = 0
+        self.direction = 1
 
-    def update(self, dt, room, player):
+    def update(self, dt, world, player):
+        self.timer -= dt
         if self.dashing:
-            self.dash_time_left -= dt
-            if self.dash_time_left <= 0:
+            self.dash_time -= dt
+            self.rect.x += int(self.speed * 2 * self.direction * dt)
+            for solid in world.solids:
+                if self.rect.colliderect(solid):
+                    if self.direction > 0:
+                        self.rect.right = solid.left
+                    else:
+                        self.rect.left = solid.right
+                    self.dashing = False
+                    self.timer = self.cooldown
+            if self.dash_time <= 0:
                 self.dashing = False
-                self.dash_timer = self.dash_cooldown
-            self.rect.x += int(self.dash_velocity.x * dt)
-            self._collide_walls(room, axis="x")
-            self.rect.y += int(self.dash_velocity.y * dt)
-            self._collide_walls(room, axis="y")
+                self.timer = self.cooldown
             return
 
-        self.dash_timer -= dt
-        direction = pygame.Vector2(player.rect.center) - pygame.Vector2(self.rect.center)
-        if direction.length_squared() > 0:
-            direction = direction.normalize()
-        self.vel = direction * self.speed
-        self.rect.x += int(self.vel.x * dt)
-        self._collide_walls(room, axis="x")
-        self.rect.y += int(self.vel.y * dt)
-        self._collide_walls(room, axis="y")
-
-        if self.dash_timer <= 0:
+        if self.timer <= 0:
+            self.direction = 1 if player.rect.centerx > self.rect.centerx else -1
             self.dashing = True
-            self.dash_time_left = self.dash_duration
-            self.dash_velocity = direction * (140 + self.speed_bonus)
+            self.dash_time = 0.4
 
-    def _collide_walls(self, room, axis):
-        for wall in room.wall_rects:
-            if self.rect.colliderect(wall):
-                if axis == "x":
-                    if self.vel.x > 0:
-                        self.rect.right = wall.left
-                    elif self.vel.x < 0:
-                        self.rect.left = wall.right
-                    self.dashing = False
-                else:
-                    if self.vel.y > 0:
-                        self.rect.bottom = wall.top
-                    elif self.vel.y < 0:
-                        self.rect.top = wall.bottom
-                    self.dashing = False
+
+class Coin(Entity):
+    def __init__(self, x, y):
+        super().__init__(x, y, 12, 12)

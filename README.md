@@ -1,46 +1,39 @@
-# 거짓의 방 (탑다운 룸 클리어 MVP)
+# 거짓의 방 - 플랫포머 MVP
 
-Python 3.x + Pygame으로 만든 탑다운 2D 룸 클리어(아이작 느낌) 미니 게임입니다. 외부 에셋이 없어도 실행되며, 없을 경우 자동으로 16x16 픽셀아트 느낌의 placeholder PNG를 생성합니다.
+어둡고 상징적인 무대에서 달리고 뛰는 2D 도트 플랫포머입니다. "사실은 전부 가짜"라는 아이작 느낌의 메타 톤을 텍스트와 배경으로 전달합니다.
 
 ## 실행 방법
 
 ```bash
 pip install pygame
-python main.py
+py main.py
 ```
 
-## 조작
+## 조작법 (마리오 스타일)
 
-- 이동: W/A/S/D
-- 공격: 방향키 (4방향 발사)
-- 방 리셋: R (지우개 아이템 획득 시)
+- 이동: A/D 또는 ←/→
+- 점프: SPACE
+- 달리기: SHIFT
+- 재시작: R
+- 종료: ESC
 
-## 특징
+## 에셋 처리
 
-- 3x3 룸 맵, 적 처치 후 문 개방
-- 적 2종: 괴물1(추적형), 괴물2(돌진형)
-- 아이템 6종: 종이 가면, 테이프, 대본, 스포트라이트, 지우개, 가위
-- 룸 진입 시 랜덤 문구 표시
-- 픽셀아트: 내부 해상도 320x240, 4x 정수배 스케일
+assets/ 폴더에 PNG가 없으면 자동으로 placeholder 이미지를 생성합니다. placeholder에는 한국어 라벨이 표시됩니다(주인공, 괴물1, 괴물2 등).
 
-## 에셋 파일명 규칙
+## 필요한 이미지 파일명 / 권장 크기
 
-assets/ 폴더에 아래 이름의 PNG를 넣으면 자동으로 로드됩니다. 없으면 코드가 자동 생성합니다.
+- assets/player.png (16x16 또는 32x32)
+- assets/enemy1.png (16x16)
+- assets/enemy2.png (16x16)
+- assets/tile_floor.png (16x16)
+- assets/tile_wall.png (16x16)
+- assets/coin.png (16x16)
+- assets/goal.png (16x24)
+- assets/bg.png (16x16 반복 타일)
 
-- player.png
-- enemy1.png
-- enemy2.png
-- bullet.png
-- floor.png
-- wall.png
-- door_closed.png
-- door_open.png
-- prop_tape.png
-- prop_mark.png
-- prop_curtain.png
-- item_mask.png
-- item_tape.png
-- item_script.png
-- item_spotlight.png
-- item_eraser.png
-- item_scissors.png
+placeholder는 pygame으로 생성되며, 사용자가 직접 PNG를 넣으면 자동 교체됩니다.
+
+## 한 줄 소개
+
+"관객은 없었다. 그래도 뛰어야 했다." — 거짓의 방은 무대와 거짓이 뒤섞인 플랫포머입니다.

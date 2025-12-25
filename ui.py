@@ -25,30 +25,21 @@ class TitleRenderer:
         title = title_font.render("거짓의 방", True, (240, 240, 240))
         subtitle = font.render("사실은 전부 무대였다.", True, (180, 180, 180))
         hint = font.render("ENTER 시작 / ESC 종료", True, (200, 200, 200)) if blink else None
-        surface.blit(title, (self.width // 2 - title.get_width() // 2, 60))
-        surface.blit(subtitle, (self.width // 2 - subtitle.get_width() // 2, 86))
+        surface.blit(title, (self.width // 2 - title.get_width() // 2, 52))
+        surface.blit(subtitle, (self.width // 2 - subtitle.get_width() // 2, 78))
         if hint:
-            surface.blit(hint, (self.width // 2 - hint.get_width() // 2, 118))
+            surface.blit(hint, (self.width // 2 - hint.get_width() // 2, 110))
 
 
 class HUD:
     def __init__(self, font):
         self.font = font
 
-    def draw(self, surface, game, player):
+    def draw(self, surface, player, game):
         for i in range(player.max_hp):
-            x = 8 + i * 10
+            x = 8 + i * 12
             y = 6
             color = (200, 60, 80) if i < player.hp else (50, 50, 50)
-            pygame.draw.rect(surface, color, pygame.Rect(x, y, 8, 8))
-        floor = getattr(game, "floor", 1)
-        text = self.font.render(f"층 {floor}  위치 X:{int(game.player.rect.x)}", True, (200, 200, 200))
-        surface.blit(text, (8, 20))
-        y = 34
-        for text in player.item_texts[-4:]:
-            rendered = self.font.render(text, True, (160, 160, 190))
-            surface.blit(rendered, (8, y))
-            y += 12
-        if game.hint_text:
-            hint = self.font.render(game.hint_text, True, (200, 180, 120))
-            surface.blit(hint, (8, surface.get_height() - 16))
+            pygame.draw.rect(surface, color, pygame.Rect(x, y, 10, 8))
+        text = self.font.render(f"HP {player.hp}/{player.max_hp}  조각 {player.score}", True, (200, 200, 200))
+        surface.blit(text, (8, 18))
