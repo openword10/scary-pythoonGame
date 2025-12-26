@@ -2,7 +2,7 @@ import random
 import pygame
 
 from assets import build_assets, load_font
-from entities import Player, Enemy1, Enemy2, Coin, Particle
+from entities import Player, Enemy1, Enemy2, Coin, AttackHitbox, Particle
 from platformer_world import TILE_SIZE, LEVEL_PIXEL_H, LEVEL_PIXEL_W, KILL_Y, STAGE_LINES, build_map, build_solid_rects, build_signs
 from ui import HUD, TitleRenderer, draw_help
 
@@ -51,11 +51,11 @@ class Game:
         self.stage_text = ""
         self.stage_timer = 0
         self.message = ""
+        self.help_requested = False
         self.attack_hitboxes = []
         self.particles = []
         self.notice = ""
         self.notice_timer = 0
-        self.hitstop_timer = 0
         self.reset_stage()
 
     def reset_stage(self):
@@ -69,13 +69,12 @@ class Game:
         self.notice_timer = 0
         self.attack_hitboxes = []
         self.particles = []
-        self.hitstop_timer = 0
         self.world.enemies = [
-            Enemy1(TILE_SIZE * 20, LEVEL_PIXEL_H - TILE_SIZE * 4),
-            Enemy1(TILE_SIZE * 34, LEVEL_PIXEL_H - TILE_SIZE * 4),
+            Enemy1(TILE_SIZE * 18, LEVEL_PIXEL_H - TILE_SIZE * 4),
+            Enemy1(TILE_SIZE * 32, LEVEL_PIXEL_H - TILE_SIZE * 4),
             Enemy2(TILE_SIZE * 48, LEVEL_PIXEL_H - TILE_SIZE * 4),
             Enemy1(TILE_SIZE * 60, LEVEL_PIXEL_H - TILE_SIZE * 4),
-            Enemy2(TILE_SIZE * 74, LEVEL_PIXEL_H - TILE_SIZE * 4),
+            Enemy2(TILE_SIZE * 72, LEVEL_PIXEL_H - TILE_SIZE * 4),
         ]
         self.world.coins = [
             Coin(TILE_SIZE * 10, LEVEL_PIXEL_H - TILE_SIZE * 6),
@@ -108,18 +107,12 @@ class Game:
                         self.state = STATE_TITLE
                         self.reset_stage()
                 elif self.state == STATE_PLAYING:
+                    if event.key == pygame.K_r:
+                        hitbox = self.player.create_attack_hitbox()
+                        if hitbox:
+                            self.attack_hitboxes.append(hitbox)
                     if event.key == pygame.K_e:
                         self.try_read_sign()
-                if self.state == STATE_PLAYING and event.key == pygame.K_SPACE:
-                    self.player.queue_jump()
-            if event.type == pygame.KEYUP:
-                if self.state == STATE_PLAYING and event.key == pygame.K_SPACE:
-                    self.player.handle_jump_release()
-            if event.type == pygame.MOUSEBUTTONDOWN and self.state == STATE_PLAYING:
-                if event.button == 1:
-                    hitbox = self.player.create_attack_hitbox()
-                    if hitbox:
-                        self.attack_hitboxes.append(hitbox)
         return True
 
     def try_read_sign(self):
@@ -131,10 +124,6 @@ class Game:
 
     def update(self, dt):
         if self.state != STATE_PLAYING:
-            return
-
-        if self.hitstop_timer > 0:
-            self.hitstop_timer = max(0, self.hitstop_timer - dt)
             return
 
         keys = pygame.key.get_pressed()
@@ -156,11 +145,8 @@ class Game:
                 if hitbox.rect.colliderect(enemy.rect):
                     enemy.alive = False
                     self.spawn_blood(enemy.rect.centerx, enemy.rect.centery)
-                    self.hitstop_timer = 0.05
             if self.player.rect.colliderect(enemy.rect):
-                if self.player.take_damage(1):
-                    self.player.vel.x = -self.player.facing * 160
-                    self.player.vel.y = -120
+                self.player.hp -= 1
                 if self.player.hp <= 0:
                     self.state = STATE_GAME_OVER
                     self.message = "무대는 끝났다."
@@ -232,8 +218,7 @@ class Game:
         goal = self.assets["goal"]
         self.render_surface.blit(goal, (self.world.goal_rect.x - self.camera_x, self.world.goal_rect.y))
 
-        if not self.player.should_blink():
-            self.render_surface.blit(self.assets["player"], (self.player.rect.x - self.camera_x, self.player.rect.y))
+        self.render_surface.blit(self.assets["player"], (self.player.rect.x - self.camera_x, self.player.rect.y))
 
         for hitbox in self.attack_hitboxes:
             self.render_surface.blit(self.assets["attack"], (hitbox.rect.x - self.camera_x, hitbox.rect.y))
@@ -256,8 +241,7 @@ class Game:
             if self.notice_timer > 0:
                 note = self.font.render(self.notice, True, (220, 220, 200))
                 self.render_surface.blit(note, (8, 26))
-            charge_ratio = self.player.jump_charge / self.player.jump_charge_max
-            self.hud.draw(self.render_surface, self.player, charge_ratio)
+            self.hud.draw(self.render_surface, self.player)
             if self.state in (STATE_GAME_OVER, STATE_VICTORY):
                 end_text = self.big_font.render(self.message, True, (220, 140, 140))
                 self.render_surface.blit(

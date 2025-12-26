@@ -14,9 +14,10 @@ py main.py
 ## 조작법
 
 - 이동: A/D 또는 ←/→
-- 점프: SPACE (꾹 누르면 차지, 떼면 더 높게)
-- 대시: SHIFT + 방향키 (런 없음)
-- 공격: 마우스 좌클릭
+- 점프: SPACE
+- 달리기: SHIFT
+- 대시: SHIFT + 방향키
+- 공격: R (앞 방향 근접 공격)
 - 표지판 읽기: E
 - 도움말: Title에서 E
 - 도움말 종료: ↑ 또는 ESC
@@ -26,7 +27,6 @@ py main.py
 ## 규칙
 
 - 구멍 아래로 떨어지면 즉사합니다.
-- 피격 시 1초 무적(깜빡임)으로 추가 피해를 받지 않습니다.
 - 맵 끝의 커튼(Goal)에 도달하면 엔딩으로 전환됩니다.
 
 ## 에셋 처리
@@ -45,7 +45,6 @@ assets/ 폴더에 PNG가 없으면 자동으로 placeholder 이미지를 생성�
 - assets/bg.png (16x16 반복 타일)
 - assets/blood.png (선택, 4x4)
 - assets/attack.png (선택, 16x12)
-- assets/ui_chargebar.png (선택)
 
 placeholder는 pygame으로 생성되며, 사용자가 직접 PNG를 넣으면 자동 교체됩니다.
 
