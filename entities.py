@@ -27,12 +27,12 @@ class AttackHitbox:
 class Particle:
     def __init__(self, x, y):
         self.pos = pygame.Vector2(x, y)
-        self.vel = pygame.Vector2(random.uniform(-80, 80), random.uniform(-140, -40))
+        self.vel = pygame.Vector2(random.uniform(-90, 90), random.uniform(-160, -50))
         self.timer = random.uniform(0.4, 0.8)
 
     def update(self, dt):
         self.timer -= dt
-        self.vel.y += 400 * dt
+        self.vel.y += 450 * dt
         self.pos += self.vel * dt
 
     def alive(self):
@@ -42,14 +42,16 @@ class Particle:
 class Player(Entity):
     def __init__(self, x, y):
         super().__init__(x, y, 14, 16)
-        self.speed = 120
-        self.run_speed = 180
-        self.accel = 1000
-        self.air_accel = 650
-        self.friction = 1200
-        self.jump_speed = 300
+        self.speed = 150
+        self.accel = 1300
+        self.air_accel = 900
+        self.friction = 1400
+        self.jump_speed = 290
+        self.jump_charge_max = 0.8
+        self.jump_charge = 0
+        self.jump_charge_rate = 1.4
         self.gravity = 900
-        self.fall_gravity = 1500
+        self.fall_gravity = 1650
         self.coyote_time = 0.1
         self.jump_buffer = 0.1
         self.coyote_timer = 0
@@ -61,22 +63,28 @@ class Player(Entity):
         self.facing = 1
         self.attack_cooldown = 0.3
         self.attack_timer = 0
-        self.dash_cooldown = 0.8
+        self.invincible_timer = 0
+        self.dash_cooldown = 0.7
         self.dash_timer = 0
-        self.dash_speed = 260
+        self.dash_speed = 320
         self.dash_time = 0
+        self.dash_invincible_timer = 0
         self.hover_time = 0.08
         self.hover_timer = 0
+        self.can_air_dash = True
 
     def update(self, dt, world, player):
         if self.on_ground:
             self.coyote_timer = self.coyote_time
+            self.can_air_dash = True
         else:
             self.coyote_timer = max(0, self.coyote_timer - dt)
         self.jump_buffer_timer = max(0, self.jump_buffer_timer - dt)
         self.attack_timer = max(0, self.attack_timer - dt)
+        self.invincible_timer = max(0, self.invincible_timer - dt)
         self.dash_timer = max(0, self.dash_timer - dt)
         self.dash_time = max(0, self.dash_time - dt)
+        self.dash_invincible_timer = max(0, self.dash_invincible_timer - dt)
         if not self.on_ground and abs(self.vel.y) < 15:
             self.hover_timer = self.hover_time
         else:
@@ -85,17 +93,15 @@ class Player(Entity):
     def handle_input(self, dt, keys):
         left = keys[pygame.K_a] or keys[pygame.K_LEFT]
         right = keys[pygame.K_d] or keys[pygame.K_RIGHT]
-        run = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
-        target_speed = self.run_speed if run else self.speed
         accel = self.accel if self.on_ground else self.air_accel
 
         if left and not right:
             self.vel.x -= accel * dt
-            self.vel.x = max(self.vel.x, -target_speed)
+            self.vel.x = max(self.vel.x, -self.speed)
             self.facing = -1
         elif right and not left:
             self.vel.x += accel * dt
-            self.vel.x = min(self.vel.x, target_speed)
+            self.vel.x = min(self.vel.x, self.speed)
             self.facing = 1
         else:
             if self.on_ground:
@@ -104,8 +110,20 @@ class Player(Entity):
                 elif self.vel.x < 0:
                     self.vel.x = min(0, self.vel.x + self.friction * dt)
 
-        if keys[pygame.K_SPACE]:
-            self.jump_buffer_timer = self.jump_buffer
+        if self.on_ground and keys[pygame.K_SPACE]:
+            self.jump_charge = min(self.jump_charge_max, self.jump_charge + self.jump_charge_rate * dt)
+
+    def handle_jump_release(self):
+        if self.on_ground and self.jump_charge > 0:
+            boost = 1.0 + (self.jump_charge / self.jump_charge_max) * 0.6
+            self.vel.y = -self.jump_speed * boost
+            self.jump_charge = 0
+            self.on_ground = False
+            return True
+        return False
+
+    def queue_jump(self):
+        self.jump_buffer_timer = self.jump_buffer
 
     def try_jump(self):
         if self.jump_buffer_timer > 0 and self.coyote_timer > 0:
@@ -117,9 +135,9 @@ class Player(Entity):
     def try_dash(self, keys):
         if self.dash_timer > 0:
             return
-        if self.on_ground:
-            return
         if not (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]):
+            return
+        if not self.can_air_dash:
             return
         direction = 0
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -128,8 +146,10 @@ class Player(Entity):
             direction = 1
         if direction != 0:
             self.vel.x = direction * self.dash_speed
-            self.dash_time = 0.12
+            self.dash_time = 0.14
             self.dash_timer = self.dash_cooldown
+            self.dash_invincible_timer = 0.2
+            self.can_air_dash = False
 
     def apply_gravity(self, dt, jump_held):
         if self.dash_time > 0:
@@ -171,15 +191,25 @@ class Player(Entity):
         if not self.can_attack():
             return None
         self.attack_timer = self.attack_cooldown
-        offset = 12 if self.facing > 0 else -12
-        rect = pygame.Rect(self.rect.centerx + offset - 8, self.rect.centery - 6, 16, 12)
+        offset = 16 if self.facing > 0 else -16
+        rect = pygame.Rect(self.rect.centerx + offset - 12, self.rect.centery - 10, 28, 18)
         return AttackHitbox(rect)
+
+    def take_damage(self, dmg):
+        if self.invincible_timer > 0 or self.dash_invincible_timer > 0:
+            return False
+        self.hp = max(0, self.hp - dmg)
+        self.invincible_timer = 1.0
+        return True
+
+    def should_blink(self):
+        return (self.invincible_timer > 0 or self.dash_invincible_timer > 0) and int(self.invincible_timer * 10) % 2 == 0
 
 
 class Enemy1(Entity):
     def __init__(self, x, y):
         super().__init__(x, y, 14, 14)
-        self.speed = 50
+        self.speed = 55
         self.direction = -1
         self.hp = 1
 
@@ -206,8 +236,8 @@ class Enemy1(Entity):
 class Enemy2(Entity):
     def __init__(self, x, y):
         super().__init__(x, y, 14, 14)
-        self.speed = 70
-        self.cooldown = 1.4
+        self.speed = 80
+        self.cooldown = 1.3
         self.timer = self.cooldown
         self.dashing = False
         self.dash_time = 0
@@ -218,7 +248,7 @@ class Enemy2(Entity):
         self.timer -= dt
         if self.dashing:
             self.dash_time -= dt
-            self.rect.x += int(self.speed * 2.2 * self.direction * dt)
+            self.rect.x += int(self.speed * 2.3 * self.direction * dt)
             for solid in world.solids:
                 if self.rect.colliderect(solid):
                     if self.direction > 0:

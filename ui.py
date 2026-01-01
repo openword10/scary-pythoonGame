@@ -35,7 +35,7 @@ class HUD:
     def __init__(self, font):
         self.font = font
 
-    def draw(self, surface, player):
+    def draw(self, surface, player, charge_ratio):
         for i in range(player.max_hp):
             x = 8 + i * 12
             y = 6
@@ -43,6 +43,15 @@ class HUD:
             pygame.draw.rect(surface, color, pygame.Rect(x, y, 10, 8))
         text = self.font.render(f"HP {player.hp}/{player.max_hp}  조각 {player.score}", True, (200, 200, 200))
         surface.blit(text, (8, 18))
+        bar_w = 120
+        bar_h = 6
+        x = 8
+        y = surface.get_height() - 14
+        pygame.draw.rect(surface, (30, 30, 40), pygame.Rect(x, y, bar_w, bar_h))
+        fill = int(bar_w * charge_ratio)
+        pygame.draw.rect(surface, (120, 200, 240), pygame.Rect(x, y, fill, bar_h))
+        label = self.font.render("차지", True, (180, 180, 180))
+        surface.blit(label, (x + bar_w + 6, y - 4))
 
 
 def draw_help(surface, font):
@@ -50,13 +59,13 @@ def draw_help(surface, font):
     lines = [
         "도움말",
         "이동: A/D 또는 ←/→",
-        "점프: SPACE",
-        "달리기: SHIFT",
-        "공격: R (앞 방향 근접 공격)",
-        "대시: SHIFT + 방향키 (공중 스냅 대시)",
+        "점프: SPACE (꾹 누르면 차지, 떼면 더 높게)",
+        "공격: 마우스 좌클릭",
+        "대시: SHIFT + 방향키",
         "도움말: E",
         "도움말 종료: ↑ 또는 ESC",
         "재시작: R (게임오버/클리어)",
+        "피해: 피격 시 1초 무적(깜빡임)",
         "목표: 맵 끝 커튼에 도달",
         "팁: 구멍 아래로 떨어지면 즉사",
     ]
