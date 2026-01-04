@@ -43,22 +43,17 @@ class Particle:
 class Player(Entity):
     def __init__(self, x, y):
         super().__init__(x, y, 18, 24)
+        # 이동/점프 관련 기본 수치
         self.base_speed = 140
         self.run_speed = 200
         self.accel = 1400
         self.air_accel = 1000
         self.friction = 1600
         self.jump_speed = 280
-        self.jump_charge_max = 0.7
-        self.jump_charge = 0
-        self.jump_charge_rate = 2.0
-        self.jump_charge_full = False
         self.gravity = 900
         self.fall_gravity = 1700
         self.coyote_time = 0.12
-        self.jump_buffer = 0.12
         self.coyote_timer = 0
-        self.jump_buffer_timer = 0
         self.max_hp = 5
         self.hp = self.max_hp
         self.on_ground = False
@@ -75,10 +70,12 @@ class Player(Entity):
         self.hover_time = 0.08
         self.hover_timer = 0
         self.can_air_dash = True
-        self.charging_jump = False
         self.anim_timer = 0
+        self.max_jumps = 2
+        self.jumps_remaining = self.max_jumps
 
     def update(self, dt, world, player):
+        # 착지 시 점프/대시 상태 초기화
         if self.on_ground:
             self.coyote_timer = self.coyote_time
             self.can_air_dash = True
@@ -121,52 +118,16 @@ class Player(Entity):
                 elif self.vel.x < 0:
                     self.vel.x = min(0, self.vel.x + self.friction * dt)
 
-        if self.on_ground and not self.charging_jump and keys[pygame.K_SPACE]:
-            self.charging_jump = True
-            self.jump_charge = 0
-            self.jump_charge_full = False
-        if self.on_ground and self.charging_jump:
-            self.jump_charge = min(self.jump_charge_max, self.jump_charge + self.jump_charge_rate * dt)
-            self.jump_charge_full = self.jump_charge >= self.jump_charge_max
-        if not self.charging_jump:
-            self.jump_charge_full = False
-
-    def start_jump_charge(self):
-        if self.on_ground:
-            self.charging_jump = True
-            self.jump_charge = 0
-            self.jump_charge_full = False
-            return True
-        return False
-
-    def handle_jump_release(self):
-        if self.charging_jump and (self.on_ground or self.coyote_timer > 0):
-            ratio = max(0.0, self.jump_charge / self.jump_charge_max)
-            if ratio < 0.05:
-                boost = 1.0
-            else:
-                boost = 1.0 + ratio * 0.3
-            self.vel.y = -self.jump_speed * boost
-            self.jump_charge = 0
-            self.jump_charge_full = False
-            self.charging_jump = False
-            self.on_ground = False
-            self.coyote_timer = 0
-            return True
-        self.charging_jump = False
-        self.jump_charge = 0
-        self.jump_charge_full = False
-        return False
-
-    def queue_jump(self):
-        self.jump_buffer_timer = self.jump_buffer
-
-    def try_jump(self):
-        if self.jump_buffer_timer > 0 and self.coyote_timer > 0 and not self.charging_jump:
-            self.vel.y = -self.jump_speed
-            self.jump_buffer_timer = 0
-            self.coyote_timer = 0
-            self.on_ground = False
+    def jump(self):
+        # 남은 점프 횟수 또는 코요테 타임을 이용한 점프
+        if self.jumps_remaining <= 0 and self.coyote_timer <= 0:
+            return False
+        self.vel.y = -self.jump_speed
+        self.on_ground = False
+        self.coyote_timer = 0
+        if self.jumps_remaining > 0:
+            self.jumps_remaining -= 1
+        return True
 
     def try_dash(self, keys):
         if self.dash_timer > 0 or self.dash_time > 0:

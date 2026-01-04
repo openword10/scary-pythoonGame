@@ -34,6 +34,7 @@ class Room:
         self._build_room()
 
     def _build_room(self):
+        # 방 기본 벽 구성
         self.base_walls = []
         for x in range(ROOM_TILES_W):
             self.base_walls.append(pygame.Rect(x * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE))
@@ -61,6 +62,7 @@ class Room:
             self.wall_rects = [wall for wall in self.wall_rects if not wall.colliderect(door_rect)]
 
     def spawn_enemies(self, difficulty):
+        # 난이도에 따른 적 생성
         self.enemies = []
         count = random.randint(2, 4 + difficulty)
         for _ in range(count):
@@ -86,6 +88,7 @@ class Room:
 
 class WorldMap:
     def __init__(self, size, item_library):
+        # 지정된 크기의 월드맵 생성
         self.size = size
         self.item_library = item_library
         self.rooms = {}

@@ -7,6 +7,7 @@ LEVEL_PIXEL_W = MAP_WIDTH * TILE_SIZE
 LEVEL_PIXEL_H = MAP_HEIGHT * TILE_SIZE
 KILL_Y = LEVEL_PIXEL_H + 64
 
+# 스테이지별 스폰 데이터
 STAGE_SPAWNS = {
     "stage_1": {
         "boss": {"name": "director", "x": LEVEL_PIXEL_W - TILE_SIZE * 10, "y": LEVEL_PIXEL_H - TILE_SIZE * 6},
@@ -45,6 +46,7 @@ class Checkpoint:
 
 
 def build_map():
+    # 기본 지형/플랫폼/구멍 생성
     tiles = [[0 for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
     ground_y = MAP_HEIGHT - 2
     for x in range(MAP_WIDTH):

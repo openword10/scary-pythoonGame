@@ -10,6 +10,7 @@ class Item:
         self.apply_fn = apply_fn
 
     def apply(self, player, game, room):
+        # 아이템 효과 적용
         self.apply_fn(player, game, room)
 
 
@@ -26,6 +27,7 @@ class ItemLibrary:
         self._build_items()
 
     def _build_items(self):
+        # 아이템 목록 구성 (효과는 람다로 전달)
         self.items = [
             Item(
                 "종이 가면",

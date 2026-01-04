@@ -40,6 +40,7 @@ def _safe_print(message):
 
 
 def ensure_asset_dir():
+    # 에셋 디렉터리가 없으면 생성
     try:
         os.makedirs(ASSET_DIR, exist_ok=True)
     except Exception as exc:
@@ -172,6 +173,7 @@ def _placeholder_attack():
 
 
 def load_font(size):
+    # 시스템 폰트를 우선 사용하고 실패 시 기본 폰트로 폴백
     try:
         return pygame.font.SysFont("malgungothic", size)
     except Exception:
@@ -190,6 +192,7 @@ def save_placeholder(filename, surface):
 
 
 def ensure_placeholders():
+    # 누락된 에셋이 있으면 임시 이미지로 생성
     ensure_asset_dir()
     font = load_font(8)
     creators = {
@@ -215,6 +218,7 @@ def ensure_placeholders():
 
 
 def load_image(filename, size=None):
+    # 파일 로드 실패 시 회색 기본 표면 반환
     path = os.path.join(ASSET_DIR, filename)
     try:
         image = pygame.image.load(path).convert_alpha()
@@ -229,6 +233,7 @@ def load_image(filename, size=None):
 
 
 def load_sprite_frames(filename, frame_size, frames_count):
+    # 스프라이트 시트를 프레임 단위로 잘라 리스트로 반환
     image = load_image(filename)
     width, height = image.get_size()
     if width >= frame_size[0] * frames_count and height >= frame_size[1]:

@@ -1,3 +1,4 @@
+# 플레이어 스프라이트 시트 프레임 정보
 PLAYER_RUN_FRAMES = 6
 PLAYER_RUN_FRAME_SIZE = (32, 32)
 PLAYER_IDLE_FRAMES = 1
@@ -5,6 +6,7 @@ PLAYER_IDLE_FRAME_SIZE = (32, 32)
 PLAYER_RUN_FILE = "player.png"
 PLAYER_IDLE_FILE = "player.png"
 
+# 적 스프라이트 시트 프레임 정보
 ENEMY1_FRAMES = 4
 ENEMY1_FRAME_SIZE = (16, 16)
 ENEMY1_FILE = "enemy1.png"
@@ -13,4 +15,9 @@ ENEMY2_FRAMES = 4
 ENEMY2_FRAME_SIZE = (16, 16)
 ENEMY2_FILE = "enemy2.png"
 
+# 게임플레이/화면 관련 설정
 BOSS_ACTIVATION_DISTANCE = 220
+SCREEN_SCALE = 0.9
+TITLE_BG_FILE = "title_bg.png"
+TITLE_TEXT_FILE = "title_text.png"
+HELP_BOX_ALPHA = 0
