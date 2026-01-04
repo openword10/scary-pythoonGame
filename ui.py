@@ -1,13 +1,17 @@
 import random
 import pygame
 
+from setting import HELP_BOX_ALPHA
+
 
 class TitleRenderer:
-    def __init__(self, width, height):
+    def __init__(self, width, height, background=None, title_image=None):
         self.width = width
         self.height = height
         self.background = pygame.Surface((width, height))
         self._build_background()
+        self.background_image = background
+        self.title_image = title_image
 
     def _build_background(self):
         for y in range(self.height):

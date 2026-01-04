@@ -205,7 +205,6 @@ class Game:
 
         keys = pygame.key.get_pressed()
         self.player.handle_input(dt, keys)
-        self.player.try_jump()
         self.player.try_dash(keys)
         self.player.apply_gravity(dt, keys[pygame.K_SPACE])
         self.player.move_and_collide(dt, self.world.solids)
@@ -331,9 +330,11 @@ class Game:
 
     def draw_world(self):
         bg = self.assets["bg"]
-        for y in range(0, LEVEL_PIXEL_H, TILE_SIZE):
-            for x in range(0, LEVEL_PIXEL_W, TILE_SIZE):
-                self.render_surface.blit(bg, (x - self.camera_x, y))
+        if bg.get_height() != self.render_surface.get_height():
+            scale_w = int(bg.get_width() * (self.render_surface.get_height() / max(1, bg.get_height())))
+            bg = pygame.transform.scale(bg, (max(1, scale_w), self.render_surface.get_height()))
+        for x in range(0, LEVEL_PIXEL_W, bg.get_width()):
+            self.render_surface.blit(bg, (x - self.camera_x, 0))
 
         floor = self.assets["tile_floor"]
         wall = self.assets["tile_wall"]
@@ -406,7 +407,13 @@ class Game:
             self.draw_world()
             if self.stage_timer > 0:
                 text = self.font.render(self.stage_text, True, (220, 200, 180))
-                self.render_surface.blit(text, (8, 8))
+                if self.stage_text == "임무는 끝나지 않았다.":
+                    self.render_surface.blit(
+                        text,
+                        (self.render_surface.get_width() // 2 - text.get_width() // 2, 8),
+                    )
+                else:
+                    self.render_surface.blit(text, (8, 8))
             if self.notice_timer > 0:
                 note = self.font.render(self.notice, True, (220, 220, 200))
                 self.render_surface.blit(note, (8, 26))

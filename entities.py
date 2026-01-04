@@ -82,9 +82,9 @@ class Player(Entity):
         if self.on_ground:
             self.coyote_timer = self.coyote_time
             self.can_air_dash = True
+            self.jumps_remaining = self.max_jumps
         else:
             self.coyote_timer = max(0, self.coyote_timer - dt)
-        self.jump_buffer_timer = max(0, self.jump_buffer_timer - dt)
         self.attack_timer = max(0, self.attack_timer - dt)
         self.invincible_timer = max(0, self.invincible_timer - dt)
         self.dash_timer = max(0, self.dash_timer - dt)
