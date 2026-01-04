@@ -7,6 +7,22 @@ LEVEL_PIXEL_W = MAP_WIDTH * TILE_SIZE
 LEVEL_PIXEL_H = MAP_HEIGHT * TILE_SIZE
 KILL_Y = LEVEL_PIXEL_H + 64
 
+STAGE_SPAWNS = {
+    "stage_1": {
+        "boss": {"name": "director", "x": LEVEL_PIXEL_W - TILE_SIZE * 10, "y": LEVEL_PIXEL_H - TILE_SIZE * 6},
+        "enemies": [
+            ("enemy1", TILE_SIZE * 20, LEVEL_PIXEL_H - TILE_SIZE * 4),
+            ("enemy1", TILE_SIZE * 34, LEVEL_PIXEL_H - TILE_SIZE * 4),
+            ("enemy2", TILE_SIZE * 48, LEVEL_PIXEL_H - TILE_SIZE * 4),
+        ],
+        "hearts": [
+            (TILE_SIZE * 10, LEVEL_PIXEL_H - TILE_SIZE * 6),
+            (TILE_SIZE * 22, LEVEL_PIXEL_H - TILE_SIZE * 6),
+            (TILE_SIZE * 40, LEVEL_PIXEL_H - TILE_SIZE * 6),
+        ],
+    }
+}
+
 STAGE_LINES = [
     "컷. 다시.",
     "웃어. 장면이 망가져.",
@@ -20,6 +36,12 @@ class Sign:
     def __init__(self, x, y, text):
         self.rect = pygame.Rect(x, y, TILE_SIZE, TILE_SIZE)
         self.text = text
+
+
+class Checkpoint:
+    def __init__(self, x, y, label="체크포인트"):
+        self.rect = pygame.Rect(x, y, TILE_SIZE, TILE_SIZE * 2)
+        self.label = label
 
 
 def build_map():
@@ -68,4 +90,12 @@ def build_signs():
         Sign(TILE_SIZE * 30, LEVEL_PIXEL_H - TILE_SIZE * 4, "커튼 뒤엔 아무도 없었다."),
         Sign(TILE_SIZE * 54, LEVEL_PIXEL_H - TILE_SIZE * 4, "임무는 복수였다."),
         Sign(TILE_SIZE * 74, LEVEL_PIXEL_H - TILE_SIZE * 4, "가짜를 진짜로 믿게 됐다."),
+    ]
+
+
+def build_checkpoints():
+    return [
+        Checkpoint(TILE_SIZE * 20, LEVEL_PIXEL_H - TILE_SIZE * 4),
+        Checkpoint(TILE_SIZE * 50, LEVEL_PIXEL_H - TILE_SIZE * 4),
+        Checkpoint(TILE_SIZE * 72, LEVEL_PIXEL_H - TILE_SIZE * 4),
     ]
