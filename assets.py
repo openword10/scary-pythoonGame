@@ -1,6 +1,21 @@
 import os
 import pygame
 
+from setting import (
+    PLAYER_RUN_FRAMES,
+    PLAYER_RUN_FRAME_SIZE,
+    PLAYER_IDLE_FRAMES,
+    PLAYER_IDLE_FRAME_SIZE,
+    PLAYER_RUN_FILE,
+    PLAYER_IDLE_FILE,
+    ENEMY1_FRAMES,
+    ENEMY1_FRAME_SIZE,
+    ENEMY1_FILE,
+    ENEMY2_FRAMES,
+    ENEMY2_FRAME_SIZE,
+    ENEMY2_FILE,
+)
+
 ASSET_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
 FILE_NAMES = {
@@ -46,10 +61,10 @@ def _draw_label(surface, text, font):
 
 
 def _placeholder_player_sheet(font):
-    sheet = pygame.Surface((128, 32), pygame.SRCALPHA)
-    for frame in range(4):
-        x0 = frame * 32
-        frame_surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+    sheet = pygame.Surface((PLAYER_RUN_FRAME_SIZE[0] * PLAYER_RUN_FRAMES, PLAYER_RUN_FRAME_SIZE[1]), pygame.SRCALPHA)
+    for frame in range(PLAYER_RUN_FRAMES):
+        x0 = frame * PLAYER_RUN_FRAME_SIZE[0]
+        frame_surf = pygame.Surface(PLAYER_RUN_FRAME_SIZE, pygame.SRCALPHA)
         frame_surf.fill((40, 40, 55))
         for x in range(10, 22):
             for y in range(8, 24):
@@ -64,9 +79,9 @@ def _placeholder_player_sheet(font):
 
 
 def _placeholder_enemy1(font):
-    sheet = pygame.Surface((64, 16), pygame.SRCALPHA)
-    for frame in range(4):
-        surf = pygame.Surface((16, 16), pygame.SRCALPHA)
+    sheet = pygame.Surface((ENEMY1_FRAME_SIZE[0] * ENEMY1_FRAMES, ENEMY1_FRAME_SIZE[1]), pygame.SRCALPHA)
+    for frame in range(ENEMY1_FRAMES):
+        surf = pygame.Surface(ENEMY1_FRAME_SIZE, pygame.SRCALPHA)
         surf.fill((40, 10, 10))
         for x in range(3, 13):
             for y in range(4, 14):
@@ -78,14 +93,14 @@ def _placeholder_enemy1(font):
             _draw_pixel(surf, 5, 8, (230, 200, 200))
             _draw_pixel(surf, 10, 8, (230, 200, 200))
         _draw_label(surf, "괴물1", font)
-        sheet.blit(surf, (frame * 16, 0))
+        sheet.blit(surf, (frame * ENEMY1_FRAME_SIZE[0], 0))
     return sheet
 
 
 def _placeholder_enemy2(font):
-    sheet = pygame.Surface((64, 16), pygame.SRCALPHA)
-    for frame in range(4):
-        surf = pygame.Surface((16, 16), pygame.SRCALPHA)
+    sheet = pygame.Surface((ENEMY2_FRAME_SIZE[0] * ENEMY2_FRAMES, ENEMY2_FRAME_SIZE[1]), pygame.SRCALPHA)
+    for frame in range(ENEMY2_FRAMES):
+        surf = pygame.Surface(ENEMY2_FRAME_SIZE, pygame.SRCALPHA)
         surf.fill((10, 10, 40))
         for x in range(3, 13):
             for y in range(4, 14):
@@ -93,7 +108,7 @@ def _placeholder_enemy2(font):
         for x in range(4, 12, 2):
             _draw_pixel(surf, x, 3 + (frame % 2), (180, 220, 255))
         _draw_label(surf, "괴물2", font)
-        sheet.blit(surf, (frame * 16, 0))
+        sheet.blit(surf, (frame * ENEMY2_FRAME_SIZE[0], 0))
     return sheet
 
 
@@ -213,17 +228,7 @@ def load_image(filename, size=None):
         return surface
 
 
-def load_player_frames():
-    sheet = load_image(FILE_NAMES["player"], size=(128, 32))
-    frames = []
-    for idx in range(4):
-        frame = pygame.Surface((32, 32), pygame.SRCALPHA)
-        frame.blit(sheet, (0, 0), pygame.Rect(idx * 32, 0, 32, 32))
-        frames.append(frame)
-    return frames
-
-
-def load_enemy_frames(filename, frame_size=(16, 16), frames_count=4):
+def load_sprite_frames(filename, frame_size, frames_count):
     image = load_image(filename)
     width, height = image.get_size()
     if width >= frame_size[0] * frames_count and height >= frame_size[1]:
@@ -236,12 +241,29 @@ def load_enemy_frames(filename, frame_size=(16, 16), frames_count=4):
     return [pygame.transform.scale(image, frame_size)]
 
 
+def load_player_run_frames():
+    return load_sprite_frames(PLAYER_RUN_FILE, PLAYER_RUN_FRAME_SIZE, PLAYER_RUN_FRAMES)
+
+
+def load_player_idle_frames():
+    return load_sprite_frames(PLAYER_IDLE_FILE, PLAYER_IDLE_FRAME_SIZE, PLAYER_IDLE_FRAMES)
+
+
+def load_enemy1_frames():
+    return load_sprite_frames(ENEMY1_FILE, ENEMY1_FRAME_SIZE, ENEMY1_FRAMES)
+
+
+def load_enemy2_frames():
+    return load_sprite_frames(ENEMY2_FILE, ENEMY2_FRAME_SIZE, ENEMY2_FRAMES)
+
+
 def build_assets():
     ensure_placeholders()
     assets = {
-        "player_frames": load_player_frames(),
-        "enemy1_frames": load_enemy_frames(FILE_NAMES["enemy1"]),
-        "enemy2_frames": load_enemy_frames(FILE_NAMES["enemy2"]),
+        "player_run_frames": load_player_run_frames(),
+        "player_idle_frames": load_player_idle_frames(),
+        "enemy1_frames": load_enemy1_frames(),
+        "enemy2_frames": load_enemy2_frames(),
         "tile_floor": load_image(FILE_NAMES["tile_floor"]),
         "tile_wall": load_image(FILE_NAMES["tile_wall"]),
         "heart": load_image(FILE_NAMES["heart"]),

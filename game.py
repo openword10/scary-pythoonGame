@@ -27,6 +27,7 @@ from platformer_world import (
     STAGE_SPAWNS,
 )
 from ui import HUD, HintBox, TitleRenderer, draw_help
+from setting import BOSS_ACTIVATION_DISTANCE
 
 
 STATE_TITLE = "title"
@@ -46,6 +47,8 @@ class World:
         self.checkpoints = build_checkpoints()
         self.goal_rect = pygame.Rect(LEVEL_PIXEL_W - TILE_SIZE * 3, TILE_SIZE * 4, TILE_SIZE, TILE_SIZE * 3)
         self.boss = None
+        self.level_width = LEVEL_PIXEL_W
+        self.camera_x = 0
 
     def is_solid_at(self, x, y):
         if x < 0 or y < 0 or x >= LEVEL_PIXEL_W or y >= LEVEL_PIXEL_H:
@@ -238,7 +241,10 @@ class Game:
                     self.world.enemies.remove(enemy)
 
         if self.world.boss and self.world.boss.alive:
-            self.world.boss.update(dt, self.world, self.player)
+            boss_distance = abs(self.player.rect.centerx - self.world.boss.rect.centerx)
+            boss_active = boss_distance <= BOSS_ACTIVATION_DISTANCE or self.player.rect.x > LEVEL_PIXEL_W - TILE_SIZE * 18
+            if boss_active:
+                self.world.boss.update(dt, self.world, self.player)
             for attack in self.world.boss.attacks:
                 if attack.rect.colliderect(self.player.rect):
                     if self.player.take_damage(attack.damage):
@@ -321,6 +327,7 @@ class Game:
         view_w = self.render_surface.get_width()
         target = self.player.rect.centerx - view_w // 2
         self.camera_x = max(0, min(target, LEVEL_PIXEL_W - view_w))
+        self.world.camera_x = self.camera_x
 
     def draw_world(self):
         bg = self.assets["bg"]
@@ -364,21 +371,17 @@ class Game:
             for attack in self.world.boss.attacks:
                 pygame.draw.rect(self.render_surface, attack.color, attack.rect.move(-self.camera_x, 0))
 
-        if self.world.boss and self.world.boss.alive:
-            pygame.draw.rect(self.render_surface, self.world.boss.color, self.world.boss.rect.move(-self.camera_x, 0))
-            for telegraph in self.world.boss.telegraphs:
-                pygame.draw.rect(self.render_surface, telegraph.color, telegraph.rect.move(-self.camera_x, 0), 1)
-            for attack in self.world.boss.attacks:
-                pygame.draw.rect(self.render_surface, attack.color, attack.rect.move(-self.camera_x, 0))
-
         goal = self.assets["goal"]
         self.render_surface.blit(goal, (self.world.goal_rect.x - self.camera_x, self.world.goal_rect.y))
 
         if not self.player.should_blink():
             frame_index = 0
             if abs(self.player.vel.x) > 10 and self.player.on_ground:
-                frame_index = int(self.player.anim_timer * 11) % 4
-            frame = self.assets["player_frames"][frame_index]
+                run_frames = self.assets["player_run_frames"]
+                frame_index = int(self.player.anim_timer * 12) % len(run_frames)
+                frame = run_frames[frame_index]
+            else:
+                frame = self.assets["player_idle_frames"][0]
             if self.player.facing < 0:
                 frame = pygame.transform.flip(frame, True, False)
             self.render_surface.blit(frame, (self.player.rect.x - self.camera_x - 7, self.player.rect.y - 6))
