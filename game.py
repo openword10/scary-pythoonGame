@@ -27,7 +27,7 @@ from platformer_world import (
     STAGE_SPAWNS,
 )
 from ui import HUD, HintBox, TitleRenderer, draw_help
-from setting import BOSS_ACTIVATION_DISTANCE, SCREEN_SCALE
+from setting import BOSS_ACTIVATION_DISTANCE
 
 
 STATE_TITLE = "title"
@@ -73,13 +73,8 @@ class Game:
         self.world = World()
         self.player = Player(TILE_SIZE * 2, LEVEL_PIXEL_H - TILE_SIZE * 4)
         self.hud = HUD(self.font)
-        self.hint_box = HintBox(load_font(8))
-        self.title_renderer = TitleRenderer(
-            self.render_surface.get_width(),
-            self.render_surface.get_height(),
-            background=self.assets.get("title_bg"),
-            title_image=self.assets.get("title_text"),
-        )
+        self.hint_box = HintBox(self.font)
+        self.title_renderer = TitleRenderer(self.render_surface.get_width(), self.render_surface.get_height())
         self.camera_x = 0
         self.stage_text = ""
         self.stage_timer = 0
@@ -181,7 +176,11 @@ class Game:
                     if event.key == pygame.K_e:
                         self.try_read_sign()
                 if self.state == STATE_PLAYING and event.key == pygame.K_SPACE:
-                    self.player.jump()
+                    if not self.player.start_jump_charge():
+                        self.player.queue_jump()
+            if event.type == pygame.KEYUP:
+                if self.state == STATE_PLAYING and event.key == pygame.K_SPACE:
+                    self.player.handle_jump_release()
             if event.type == pygame.KEYDOWN and self.state == STATE_PLAYING:
                 if event.key == pygame.K_r:
                     hitbox = self.player.create_attack_hitbox()
@@ -312,8 +311,9 @@ class Game:
         self.player.vel.update(0, 0)
         self.player.invincible_timer = 0.5
         self.player.dash_invincible_timer = 0
+        self.player.charging_jump = False
+        self.player.jump_charge = 0
         self.player.on_ground = False
-        self.player.jumps_remaining = self.player.max_jumps
         self.camera_x = max(0, min(self.player.rect.centerx - self.render_surface.get_width() // 2, LEVEL_PIXEL_W - self.render_surface.get_width()))
         self.notice = "다시 연기했다."
         self.notice_timer = 1.4
@@ -359,14 +359,10 @@ class Game:
             if isinstance(enemy, Enemy1):
                 frames = self.assets["enemy1_frames"]
                 frame_index = int(enemy.anim_timer * 10) % len(frames)
-                facing = enemy.direction
             else:
                 frames = self.assets["enemy2_frames"]
                 frame_index = int(enemy.anim_timer * 8) % len(frames)
-                facing = enemy.direction
             frame = frames[frame_index]
-            if facing < 0:
-                frame = pygame.transform.flip(frame, True, False)
             self.render_surface.blit(frame, (enemy.rect.x - self.camera_x, enemy.rect.y))
 
         if self.world.boss and self.world.boss.alive:
@@ -421,7 +417,10 @@ class Game:
             if self.notice_timer > 0:
                 note = self.font.render(self.notice, True, (220, 220, 200))
                 self.render_surface.blit(note, (8, 26))
-            self.hud.draw(self.render_surface, self.player, self.play_time)
+            charge_ratio = 0
+            if self.player.jump_charge_max > 0:
+                charge_ratio = min(1.0, self.player.jump_charge / self.player.jump_charge_max)
+            self.hud.draw(self.render_surface, self.player, charge_ratio, self.player.jump_charge_full, self.play_time)
             self.hint_box.draw(self.render_surface)
             if self.state in (STATE_GAME_OVER, STATE_VICTORY):
                 end_text = self.big_font.render(self.message, True, (220, 140, 140))
@@ -440,14 +439,8 @@ class Game:
         if self.shake_timer > 0:
             shake_x = random.randint(-self.shake_strength, self.shake_strength)
             shake_y = random.randint(-self.shake_strength, self.shake_strength)
-        target_size = (
-            max(1, int(self.screen.get_width() * SCREEN_SCALE)),
-            max(1, int(self.screen.get_height() * SCREEN_SCALE)),
-        )
-        scaled = pygame.transform.scale(self.render_surface, target_size)
-        offset_x = (self.screen.get_width() - target_size[0]) // 2
-        offset_y = (self.screen.get_height() - target_size[1]) // 2
-        self.screen.blit(scaled, (offset_x + shake_x, offset_y + shake_y))
+        scaled = pygame.transform.scale(self.render_surface, self.screen.get_size())
+        self.screen.blit(scaled, (shake_x, shake_y))
         pygame.display.flip()
 
     def run(self):
