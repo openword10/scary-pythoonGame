@@ -248,10 +248,15 @@ class Enemy1(Entity):
         self.speed = speed
         self.direction = -1
         self.hp = 1
+        self.anim_timer = 0
 
     def update(self, dt, world, player):
         self.vel.x = self.direction * self.speed
         self.rect.x += int(self.vel.x * dt)
+        if abs(self.vel.x) > 1:
+            self.anim_timer += dt
+        else:
+            self.anim_timer = 0
         hit_wall = False
         for solid in world.solids:
             if self.rect.colliderect(solid):
@@ -279,9 +284,15 @@ class Enemy2(Entity):
         self.dash_time = 0
         self.direction = 1
         self.hp = 1
+        self.anim_timer = 0
+        self.base_y = y
+        self.float_timer = random.uniform(0, 1)
 
     def update(self, dt, world, player):
         self.timer -= dt
+        self.float_timer += dt
+        self.rect.y = self.base_y + int(2 * math.sin(self.float_timer * 3))
+        self.anim_timer += dt
         if self.dashing:
             self.dash_time -= dt
             self.rect.x += int(self.speed * 2.4 * self.direction * dt)
