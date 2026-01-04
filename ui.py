@@ -83,6 +83,27 @@ class HintBox:
             surface.blit(text, (x + padding, y + padding + idx * (self.font.get_height() + 2)))
 
 
+class HintBox:
+    def __init__(self, font):
+        self.font = font
+
+    def draw(self, surface):
+        lines = [
+            "R 공격",
+            "SHIFT 달리기",
+            "SHIFT+방향 대시",
+        ]
+        padding = 4
+        width = max(self.font.size(line)[0] for line in lines) + padding * 2
+        height = len(lines) * 14 + padding * 2
+        x = surface.get_width() - width - 8
+        y = surface.get_height() - height - 8
+        pygame.draw.rect(surface, (20, 20, 30), pygame.Rect(x, y, width, height))
+        for idx, line in enumerate(lines):
+            text = self.font.render(line, True, (200, 200, 200))
+            surface.blit(text, (x + padding, y + padding + idx * 14))
+
+
 def draw_help(surface, font):
     surface.fill((12, 12, 20))
     lines = [
