@@ -364,6 +364,13 @@ class Game:
             for attack in self.world.boss.attacks:
                 pygame.draw.rect(self.render_surface, attack.color, attack.rect.move(-self.camera_x, 0))
 
+        if self.world.boss and self.world.boss.alive:
+            pygame.draw.rect(self.render_surface, self.world.boss.color, self.world.boss.rect.move(-self.camera_x, 0))
+            for telegraph in self.world.boss.telegraphs:
+                pygame.draw.rect(self.render_surface, telegraph.color, telegraph.rect.move(-self.camera_x, 0), 1)
+            for attack in self.world.boss.attacks:
+                pygame.draw.rect(self.render_surface, attack.color, attack.rect.move(-self.camera_x, 0))
+
         goal = self.assets["goal"]
         self.render_surface.blit(goal, (self.world.goal_rect.x - self.camera_x, self.world.goal_rect.y))
 
