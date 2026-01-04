@@ -348,8 +348,21 @@ class Game:
             self.render_surface.blit(self.assets["heart"], (heart.rect.x - self.camera_x, heart.rect.y))
 
         for enemy in self.world.enemies:
-            image_key = "enemy1" if isinstance(enemy, Enemy1) else "enemy2"
-            self.render_surface.blit(self.assets[image_key], (enemy.rect.x - self.camera_x, enemy.rect.y))
+            if isinstance(enemy, Enemy1):
+                frames = self.assets["enemy1_frames"]
+                frame_index = int(enemy.anim_timer * 10) % len(frames)
+            else:
+                frames = self.assets["enemy2_frames"]
+                frame_index = int(enemy.anim_timer * 8) % len(frames)
+            frame = frames[frame_index]
+            self.render_surface.blit(frame, (enemy.rect.x - self.camera_x, enemy.rect.y))
+
+        if self.world.boss and self.world.boss.alive:
+            pygame.draw.rect(self.render_surface, self.world.boss.color, self.world.boss.rect.move(-self.camera_x, 0))
+            for telegraph in self.world.boss.telegraphs:
+                pygame.draw.rect(self.render_surface, telegraph.color, telegraph.rect.move(-self.camera_x, 0), 1)
+            for attack in self.world.boss.attacks:
+                pygame.draw.rect(self.render_surface, attack.color, attack.rect.move(-self.camera_x, 0))
 
         if self.world.boss and self.world.boss.alive:
             pygame.draw.rect(self.render_surface, self.world.boss.color, self.world.boss.rect.move(-self.camera_x, 0))
